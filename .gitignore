@@ -1,0 +1,16 @@
+# Session cookies / credentials — never commit
+linkedin_cookies.json
+*.cookies.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.venv-*/
+venv/
+.ruff_cache/
+*.egg-info/
+
+# Tooling / local
+.slim/deepwork/
+.ignore
