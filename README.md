@@ -31,6 +31,9 @@ python -m linkedin_auto_connect
 linkedin-auto-connect
 ```
 
+> The old single-file `python linkedin-auto-connect.py` entry point no longer
+> exists; it is still in git history if you need the original.
+
 **First run:** a visible browser opens so you can log in by hand. Once you are
 logged in, the cookies are saved to `linkedin_cookies.json` and reused.
 

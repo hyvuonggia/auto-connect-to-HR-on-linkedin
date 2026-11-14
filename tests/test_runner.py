@@ -5,8 +5,9 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import replace
 
-from fakes import FakeCard, FakeLimitPolicy, FakeMatcher, FakeSource
+from fakes import FakeCard, FakeLimitPolicy, FakeSource
 from linkedin_auto_connect.config import Settings
+from linkedin_auto_connect.matcher import KeywordMatcher
 from linkedin_auto_connect.models import InviteStatus, SessionResult, StopReason
 from linkedin_auto_connect.runner import ConnectionRunner
 
@@ -30,7 +31,7 @@ def make_runner(
     sleeper = sleeps.append if sleeps is not None else (lambda _seconds: None)
     return ConnectionRunner(
         source,
-        FakeMatcher(["hr"]),
+        KeywordMatcher(["hr"]),
         policy,
         settings or make_settings(max_passes_per_session=1, max_no_match_passes=10),
         should_stop=stop,

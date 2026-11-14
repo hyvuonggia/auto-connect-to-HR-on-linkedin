@@ -26,7 +26,7 @@ can be tested in milliseconds.
    └──────────┘          └───────────────┘        └────────────────┘
                                  │
                  ┌───────────────▼───────────────┐
-   adapters      │ browser.py    Playwright       │  the only module that
+   adapters      │ browser.py    Playwright       │  the only adapter that
                  │ cookies.py    JSON file        │  imports playwright
                  └───────────────────────────────┘
 ```
@@ -83,7 +83,7 @@ a blocked session never restart.
   `process_connections_on_page` did all five.
 - **OCP** — a new audience (`SeniorityMatcher`, `TitleMatcher`) or a new limit
   signal is a new class behind an existing port; no loop edits.
-- **LSP** — `FakeSource` and `PlaywrightPage` are interchangeable from the
+- **LSP** — `FakeSource` and `LinkedInNetworkPage` are interchangeable from the
   runner's point of view, including the "no cards rendered yet" state.
 - **ISP** — `ProfileCard` has two members; the runner never sees cookies,
   navigation or settings beyond the timings it uses.
@@ -97,3 +97,9 @@ a blocked session never restart.
 - No reporting abstraction: modules log, `cli.configure_logging` owns formatting.
 - No async: Playwright's sync API is what the original script used and the
   workload is inherently serial (one browser, one page).
+- The "never overwrite a good cookie jar with an empty one" guard lives in
+  `cookies.JsonCookieStore.save`, not in the application: persisting is the
+  store's job, and `Application` simply asks it to save after every clean
+  session.
+- The old single-file script was deleted rather than kept as a shim; git history
+  has it, and one entry point is easier to keep honest.

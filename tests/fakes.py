@@ -21,21 +21,6 @@ def _never_stop() -> bool:
     return False
 
 
-class FakeMatcher:
-    """Matcher fake: text matches when it contains one of the keywords."""
-
-    def __init__(self, keywords: Iterable[str] = ()) -> None:
-        """Store the keywords (case-insensitive) and clear the call log."""
-        self.keywords = tuple(keyword.lower() for keyword in keywords)
-        self.seen: list[str] = []
-
-    def matches(self, text: str) -> bool:
-        """Return True when ``text`` contains any configured keyword."""
-        self.seen.append(text)
-        lowered = text.lower()
-        return any(keyword in lowered for keyword in self.keywords)
-
-
 class FakeCard:
     """Profile card fake returning scripted invite results."""
 

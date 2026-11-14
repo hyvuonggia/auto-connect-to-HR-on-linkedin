@@ -12,13 +12,13 @@ from fakes import (
     FakeCard,
     FakeCookieStore,
     FakeLimitPolicy,
-    FakeMatcher,
     FakeSession,
     FakeSessionFactory,
     FakeSource,
 )
 from linkedin_auto_connect.app import Application
 from linkedin_auto_connect.config import Settings
+from linkedin_auto_connect.matcher import KeywordMatcher
 from linkedin_auto_connect.models import LoginStatus
 
 COOKIES: list[dict[str, Any]] = [{"name": "li_at", "value": "secret"}]
@@ -52,7 +52,7 @@ def make_app(
         factory,
         store,
         settings or make_settings(),
-        FakeMatcher(["hr"]),
+        KeywordMatcher(["hr"]),
         should_stop=should_stop if should_stop is not None else (lambda: False),
         sleeper=sleeper,
         policy=policy or FakeLimitPolicy(),
