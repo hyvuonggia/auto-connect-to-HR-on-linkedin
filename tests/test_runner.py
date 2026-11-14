@@ -77,6 +77,27 @@ def test_invisible_connect_button_is_retried_on_the_next_pass() -> None:
     assert "Mona Lisa" in processed
 
 
+def test_unconfirmed_invite_is_not_retried_and_does_not_trip_the_limit() -> None:
+    """An unknown outcome suppresses retries but never counts as a limit signal."""
+    card = FakeCard(
+        "Flaky Person",
+        "hr manager",
+        [InviteStatus.UNCONFIRMED, InviteStatus.REGISTERED],
+    )
+    source = FakeSource([card])
+    policy = FakeLimitPolicy(unregistered_limit=1)
+
+    result = make_runner(
+        source,
+        policy,
+        settings=make_settings(max_passes_per_session=2, max_no_match_passes=10),
+    ).run()
+
+    assert result == SessionResult(invites=0, reason=StopReason.SCROLL_CAP)
+    assert card.send_calls == 1
+    assert policy.unregistered_calls == 0
+
+
 def test_blank_candidate_name_is_skipped() -> None:
     """A malformed card without a usable name is never clicked or remembered."""
     card = FakeCard("   ", "hr manager")

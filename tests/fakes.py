@@ -15,10 +15,7 @@ from linkedin_auto_connect.models import (
     InviteStatus,
     LoginStatus,
 )
-
-
-def _never_stop() -> bool:
-    return False
+from linkedin_auto_connect.ports import never_stop
 
 
 class FakeCard:
@@ -137,7 +134,7 @@ class FakeSession:
         self,
         *,
         allow_manual_login: bool,
-        should_stop: Callable[[], bool] = _never_stop,
+        should_stop: Callable[[], bool] = never_stop,
     ) -> LoginStatus:
         """Record the call and return the next scripted login status."""
         self.authenticate_calls.append(
@@ -216,7 +213,9 @@ class FakeCookieStore:
         return [dict(cookie) for cookie in self.initial]
 
     def save(self, cookies: Sequence[dict[str, Any]]) -> None:
-        """Record one saved cookie jar."""
+        """Record one saved jar, refusing an empty one like the real store."""
+        if not cookies:
+            return
         self.saved.append([dict(cookie) for cookie in cookies])
         if self._events is not None:
             self._events.append("store:save")

@@ -48,7 +48,7 @@ Press `Ctrl+C` to stop gracefully.
 | Flag | Default | Meaning |
 | --- | --- | --- |
 | `--max-invites N` | `200` | Stop after N registered invites (`0` = unlimited) |
-| `--no-headless` | headless | Watch the browser instead of hiding it |
+| `--no-headless` | headless | Watch the browser instead of hiding it (`--headless` is the default form) |
 | `--keywords "a,b,c"` | HR list | Replace the audience keywords |
 | `--cookies PATH` | `linkedin_cookies.json` | Where the cookie jar is stored |
 | `--max-restarts N` | `15` | Browser restarts when a session stops finding profiles |
@@ -94,7 +94,15 @@ Run the tests with `pytest`; they never launch a browser.
 
 ## Notes
 
-- `linkedin_cookies.json` holds your live LinkedIn session. It is git-ignored —
+- `linkedin_cookies.json` holds your live LinkedIn session and is resolved from
+  the current working directory (`--cookies` overrides it). It is git-ignored —
   **do not commit or share it**.
+- The `--scroll-pause` and `--click-pause` defaults match the original script,
+  with one fix: the original waited ~1.5 *milliseconds* after a click because of
+  a missing unit conversion, so clicks are now paced as intended (1.5 s).
+- Knobs that are not CLI flags (`scroll_pixels`, `registration_wait_ms`,
+  `max_unregistered_clicks`, `max_passes_per_session`, `max_no_match_passes`)
+  live in `Settings` in
+  [config.py](src/linkedin_auto_connect/config.py).
 - Automating LinkedIn can violate its User Agreement and may get the account
   rate-limited or restricted. Use at your own risk.

@@ -9,23 +9,34 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from linkedin_auto_connect.browser import (
     CARD_SELECTOR,
     CONNECT_BUTTON_SELECTOR,
+    PENDING_BUTTON_SELECTOR,
     LinkedInNetworkPage,
     PlaywrightCard,
+    PlaywrightSession,
     parse_invite_label,
 )
 from linkedin_auto_connect.config import Settings
-from linkedin_auto_connect.models import InviteStatus
+from linkedin_auto_connect.models import InviteStatus, LoginStatus
 
 
 class StubButton:
-    """A Connect button that is present, visible and clickable."""
+    """A Connect button whose click behaviour is scripted."""
 
-    def __init__(self, label: str = "Invite Jane Doe to connect", *, detaches: bool = True) -> None:
+    def __init__(
+        self,
+        label: str = "Invite Jane Doe to connect",
+        *,
+        detaches: bool = True,
+        click_mode: str = "ok",
+    ) -> None:
         self.label = label
         self.detaches = detaches
+        self.click_mode = click_mode
         self.clicks = 0
 
     def count(self) -> int:
@@ -42,6 +53,12 @@ class StubButton:
         return True
 
     def click(self, timeout: int) -> None:
+        from playwright.sync_api import TimeoutError as PlaywrightTimeout
+
+        if self.click_mode == "timeout":
+            raise PlaywrightTimeout("click intercepted")
+        if self.click_mode == "error":
+            raise RuntimeError("target closed")
         self.clicks += 1
 
     def wait_for(self, *, state: str, timeout: int) -> None:
@@ -63,14 +80,18 @@ class StubCard:
         button: StubButton | None = None,
         *,
         with_button: bool = True,
+        pending_visible: bool = False,
     ) -> None:
         self.text = text
         self.button = button if button is not None else StubButton()
         self.with_button = with_button
+        self.pending = StubPending(pending_visible)
 
     def locator(self, selector: str) -> Any:
         if selector == CONNECT_BUTTON_SELECTOR and self.with_button:
             return self.button
+        if selector == PENDING_BUTTON_SELECTOR:
+            return self.pending
         return _Empty()
 
     def inner_text(self) -> str:
@@ -86,6 +107,23 @@ class _Empty:
     @property
     def first(self) -> _Empty:
         return self
+
+
+class StubPending:
+    """A Pending button locator with scripted visibility."""
+
+    def __init__(self, visible: bool) -> None:
+        self._visible = visible
+
+    def count(self) -> int:
+        return 1
+
+    @property
+    def first(self) -> StubPending:
+        return self
+
+    def is_visible(self) -> bool:
+        return self._visible
 
 
 class StubCards:
@@ -178,3 +216,103 @@ def test_send_invite_reports_unavailable_without_a_button() -> None:
     card = PlaywrightCard(StubPage([]), StubCard(with_button=False), Settings())
 
     assert card.send_invite().status is InviteStatus.UNAVAILABLE
+
+
+def test_send_invite_registers_when_pending_appears_without_detaching() -> None:
+    """A Pending button that replaces the label, without detaching, also counts."""
+    card = StubCard(button=StubButton(detaches=False), pending_visible=True)
+    page = StubPage([card])
+
+    result = LinkedInNetworkPage(page, Settings()).open_cards()[0].send_invite()
+
+    assert result.status is InviteStatus.REGISTERED
+
+
+def test_send_invite_reports_timed_out_when_the_click_is_intercepted() -> None:
+    """A click a modal intercepts did not register, and is not a limit signal alone."""
+    card = StubCard(button=StubButton(click_mode="timeout"))
+    page = StubPage([card])
+
+    result = LinkedInNetworkPage(page, Settings()).open_cards()[0].send_invite()
+
+    assert result.status is InviteStatus.TIMED_OUT
+
+
+def test_send_invite_reports_unconfirmed_on_an_unexpected_click_error() -> None:
+    """An unexpected browser error must not be mistaken for a weekly-limit signal."""
+    card = StubCard(button=StubButton(click_mode="error"))
+    page = StubPage([card])
+
+    result = LinkedInNetworkPage(page, Settings()).open_cards()[0].send_invite()
+
+    assert result.status is InviteStatus.UNCONFIRMED
+    assert "target closed" in result.detail
+
+
+class _NoCookies:
+    """A cookie store with nothing saved and no persistence allowed."""
+
+    def load(self) -> None:
+        return None
+
+    def save(self, cookies: Any) -> None:
+        raise AssertionError("authenticate() must never persist cookies")
+
+
+class StubContext:
+    """A browser context that must not receive cookies in these tests."""
+
+    def add_cookies(self, cookies: Any) -> None:
+        raise AssertionError("no cookies were scripted")
+
+    def cookies(self) -> list[dict[str, Any]]:
+        return []
+
+
+class StubAuthPage:
+    """A page that lands on a scripted URL for every navigation."""
+
+    def __init__(self, landings: dict[str, str]) -> None:
+        self._landings = landings
+        self._url = "about:blank"
+
+    def goto(self, url: str, *, timeout: int | None = None, wait_until: str | None = None) -> None:
+        self._url = self._landings.get(url, url)
+
+    def wait_for_timeout(self, milliseconds: float) -> None:
+        pass
+
+    @property
+    def url(self) -> str:
+        return self._url
+
+
+def _auth_session(landings: dict[str, str]) -> PlaywrightSession:
+    return PlaywrightSession(
+        page=StubAuthPage(landings),
+        context=StubContext(),
+        browser=object(),
+        cookie_store=_NoCookies(),
+        settings=Settings(),
+    )
+
+
+FEED_URL = "https://www.linkedin.com/feed/"
+
+
+@pytest.mark.parametrize(
+    ("landing", "expected"),
+    [
+        (FEED_URL, LoginStatus.AUTHENTICATED),
+        ("https://www.linkedin.com/login", LoginStatus.EXPIRED),
+        ("https://www.linkedin.com/challenge/abc", LoginStatus.CHALLENGE),
+        ("https://www.linkedin.com/other", LoginStatus.EXPIRED),
+    ],
+)
+def test_authenticate_maps_the_landing_url_to_a_login_status(
+    landing: str, expected: LoginStatus
+) -> None:
+    """Saved cookies are judged by where LinkedIn actually lands us."""
+    session = _auth_session({FEED_URL: landing})
+
+    assert session.authenticate(allow_manual_login=False) is expected

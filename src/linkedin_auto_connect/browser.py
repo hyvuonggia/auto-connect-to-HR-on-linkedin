@@ -388,7 +388,7 @@ class PlaywrightCard:
             return self._send_invite()
         except Exception as exc:
             logger.warning("Unexpected error while sending an invite: %s", exc, exc_info=True)
-            return InviteResult(InviteStatus.UNREGISTERED, f"{type(exc).__name__}: {exc}")
+            return InviteResult(InviteStatus.UNCONFIRMED, f"{type(exc).__name__}: {exc}")
 
     def _send_invite(self) -> InviteResult:
         button = self._connect_button()
@@ -414,7 +414,7 @@ class PlaywrightCard:
             return InviteResult(InviteStatus.TIMED_OUT, label or "click timed out")
         except Exception as exc:
             logger.warning("Connect click failed for %s: %s", label or "<unknown>", exc)
-            return InviteResult(InviteStatus.UNREGISTERED, f"click failed: {exc}")
+            return InviteResult(InviteStatus.UNCONFIRMED, f"click failed: {exc}")
 
         self._page.wait_for_timeout(self._settings.click_pause_seconds * 1000)
 

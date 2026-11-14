@@ -103,3 +103,6 @@ a blocked session never restart.
   session.
 - The old single-file script was deleted rather than kept as a shim; git history
   has it, and one entry point is easier to keep honest.
+- `parse_invite_label` strips only the leading "Invite" and trailing "to connect"
+  (the old script removed every occurrence anywhere in the label). A name that
+  happens to contain "to connect" is now preserved instead of mangled.

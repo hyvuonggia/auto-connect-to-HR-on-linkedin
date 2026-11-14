@@ -30,7 +30,15 @@ class InviteStatus(Enum):
     """The click itself timed out; the invite cannot have registered."""
 
     UNAVAILABLE = "unavailable"
-    """No visible Connect button on the card."""
+    """No visible Connect button on the card; nothing was clicked, so it can be retried."""
+
+    UNCONFIRMED = "unconfirmed"
+    """An unexpected error left the outcome unknown.
+
+    The card counts as attempted (never retried, to avoid a duplicate invite)
+    but must not advance the weekly-limit streak, since it says nothing about
+    the limit.
+    """
 
 
 class StopReason(Enum):
@@ -56,10 +64,6 @@ class InviteResult:
 
     status: InviteStatus
     detail: str = ""
-
-    @property
-    def registered(self) -> bool:
-        return self.status is InviteStatus.REGISTERED
 
 
 @dataclass(frozen=True, slots=True)

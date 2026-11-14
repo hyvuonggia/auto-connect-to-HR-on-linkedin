@@ -77,6 +77,12 @@ class JsonCookieStore:
             suffix=".tmp",
         )
         temporary_path = Path(temporary_name)
+        # The jar is a bearer credential: keep the file private where the OS can.
+        if hasattr(os, "fchmod"):
+            try:
+                os.fchmod(descriptor, 0o600)
+            except OSError:
+                logger.debug("Could not restrict the cookie file mode.", exc_info=True)
         try:
             with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
                 handle.write(payload)
@@ -84,3 +90,7 @@ class JsonCookieStore:
         except BaseException:
             temporary_path.unlink(missing_ok=True)
             raise
+        try:
+            self._path.chmod(0o600)
+        except OSError:
+            logger.debug("Could not restrict the cookie file mode.", exc_info=True)

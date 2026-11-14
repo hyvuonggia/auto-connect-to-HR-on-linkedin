@@ -92,10 +92,9 @@ def test_headless_expired_logs_in_visibly_saves_and_reopens_headless() -> None:
         "open:True",
         "s3:authenticate",
         "s3:cookies",
-        "store:save",
         "s3:close",
     ]
-    assert store.saved == [cookies, []]
+    assert store.saved == [cookies]
     assert sessions[0].authenticate_calls[0]["allow_manual_login"] is False
     assert sessions[1].authenticate_calls[0]["allow_manual_login"] is True
     assert sessions[2].authenticate_calls[0]["allow_manual_login"] is False
@@ -133,7 +132,11 @@ def test_stalled_session_restarts_until_max_restarts_then_stops() -> None:
     """Each stall opens a fresh session until the restart budget is exhausted."""
     settings = make_settings(max_restarts=2, max_no_match_passes=1, max_passes_per_session=10)
     sessions = [
-        FakeSession(FakeSource([FakeCard("Plain Person", "software engineer")]), label=f"s{index}")
+        FakeSession(
+            FakeSource([FakeCard("Plain Person", "software engineer")]),
+            cookies=COOKIES,
+            label=f"s{index}",
+        )
         for index in range(3)
     ]
     factory = FakeSessionFactory(sessions)
@@ -184,7 +187,7 @@ def test_visible_challenge_stops_and_closes_every_session() -> None:
 def test_stopped_reason_ends_the_run_without_a_restart() -> None:
     """Ctrl+C stops the run after the current session; no replacement opens."""
     settings = make_settings(max_restarts=5)
-    session = FakeSession()
+    session = FakeSession(cookies=COOKIES)
     factory = FakeSessionFactory([session])
     store = FakeCookieStore()
     calls = 0
@@ -209,7 +212,7 @@ def test_stopped_reason_ends_the_run_without_a_restart() -> None:
 
 def test_returns_the_total_registered_invites() -> None:
     """Registered invites from the session loop are returned to the CLI."""
-    session = FakeSession(FakeSource([FakeCard("HR Person", "hr manager")]))
+    session = FakeSession(FakeSource([FakeCard("HR Person", "hr manager")]), cookies=COOKIES)
     policy = FakeLimitPolicy()
     settings = make_settings(max_no_match_passes=2)
     factory = FakeSessionFactory([session])

@@ -97,3 +97,12 @@ def test_main_returns_zero_even_when_invites_were_sent(monkeypatch: pytest.Monke
     )
 
     assert main([]) == 0
+
+
+@pytest.mark.parametrize("flag", ["--max-invites", "--max-restarts"])
+def test_negative_counts_are_rejected(flag: str) -> None:
+    """A negative cap or restart budget is a typo, not 'unlimited'."""
+    with pytest.raises(SystemExit) as excinfo:
+        build_parser().parse_args([flag, "-1"])
+
+    assert excinfo.value.code == 2

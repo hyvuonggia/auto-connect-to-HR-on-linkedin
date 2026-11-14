@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import stat
+from pathlib import Path
 
 import pytest
 
@@ -115,3 +118,12 @@ def test_save_leaves_no_temporary_files_behind(tmp_path) -> None:
     path = tmp_path / "cookies.json"
     JsonCookieStore(path).save(COOKIES)
     assert list(tmp_path.iterdir()) == [path]
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Windows has no POSIX mode bits")
+def test_saved_cookie_file_is_private(tmp_path: Path) -> None:
+    """The jar is a bearer credential and must not be group/world readable."""
+    path = tmp_path / "cookies.json"
+    JsonCookieStore(path).save(COOKIES)
+
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600

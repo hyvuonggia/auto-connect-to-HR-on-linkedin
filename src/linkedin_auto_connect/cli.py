@@ -18,6 +18,17 @@ from .config import Settings
 logger = logging.getLogger(__name__)
 
 
+def _non_negative_int(value: str) -> int:
+    """argparse type for counts: reject negatives instead of treating them as unlimited."""
+    try:
+        number = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"invalid integer: {value!r}") from exc
+    if number < 0:
+        raise argparse.ArgumentTypeError("must be zero or greater")
+    return number
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the parser shared by the console script and ``python -m``."""
     parser = argparse.ArgumentParser(
@@ -26,7 +37,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--max-invites",
-        type=int,
+        type=_non_negative_int,
         default=None,
         metavar="N",
         help="stop after N registered invites (0 = unlimited)",
@@ -52,7 +63,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--max-restarts",
-        type=int,
+        type=_non_negative_int,
         default=None,
         metavar="N",
         help="maximum browser restarts after a stalled session",

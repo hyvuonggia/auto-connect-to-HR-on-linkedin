@@ -133,6 +133,17 @@ class ConnectionRunner:
             self._processed.add(name)
             invite = card.send_invite()
 
+            if invite.status is InviteStatus.UNCONFIRMED:
+                # Attempted but the outcome is unknown: keep it as attempted so a
+                # possible invite is never duplicated, and do not touch the
+                # weekly-limit streak, which this says nothing about.
+                logger.warning(
+                    "  [!] Invite state unknown for %.40s (%s) — not retrying.",
+                    name,
+                    invite.detail or "unexpected error",
+                )
+                continue
+
             if invite.status in (InviteStatus.TIMED_OUT, InviteStatus.UNREGISTERED):
                 detail = f" ({invite.detail})" if invite.detail else ""
                 limit_assumed = self._policy.record_unregistered()
