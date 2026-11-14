@@ -1,9 +1,9 @@
 """Ports (interfaces) the application core depends on.
 
-The core modules -- ``runner``, ``app``, ``limits``, ``matcher`` -- import only
-from this module and :mod:`linkedin_auto_connect.models`. They never import
-Playwright: the browser adapter in :mod:`linkedin_auto_connect.browser`
-implements these protocols, and the tests implement them with fakes.
+The domain and application modules import only from this module and
+:mod:`linkedin_auto_connect.domain.models`. They never import Playwright: the
+browser adapter implements these protocols, and the tests implement them with
+fakes.
 """
 
 from __future__ import annotations

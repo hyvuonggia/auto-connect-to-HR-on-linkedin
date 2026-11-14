@@ -1,8 +1,8 @@
 """Playwright implementation of the browser ports.
 
 This is the only module that imports Playwright. The application core depends on
-:mod:`linkedin_auto_connect.ports`; this adapter turns those protocols into a
-Firefox session and a live view of the "People you may know" page.
+:mod:`linkedin_auto_connect.domain.ports`; this adapter turns those protocols into
+a Firefox session and a live view of the "People you may know" page.
 
 Behaviour mirrors the original single-file script: the same selectors, the same
 login detection, and the same click-then-verify-invite flow.
@@ -26,9 +26,9 @@ from playwright.sync_api import (
     TimeoutError as PlaywrightTimeout,
 )
 
-from .config import Settings
-from .models import Candidate, InviteResult, InviteStatus, LoginStatus
-from .ports import CookieStore, ProfileCard, ProfileSource, never_stop
+from ..config import Settings
+from ..domain.models import Candidate, InviteResult, InviteStatus, LoginStatus
+from ..domain.ports import CookieStore, ProfileCard, ProfileSource, never_stop
 
 logger = logging.getLogger(__name__)
 

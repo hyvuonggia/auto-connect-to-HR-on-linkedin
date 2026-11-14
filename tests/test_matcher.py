@@ -10,12 +10,12 @@ import pytest
 
 from fakes import FakeClassifier, it_decision
 from linkedin_auto_connect.config import DEFAULT_KEYWORDS
-from linkedin_auto_connect.matcher import (
+from linkedin_auto_connect.domain.matcher import (
     ItRelevanceMatcher,
     KeywordMatcher,
     candidate_name,
 )
-from linkedin_auto_connect.models import JevRuntimeError, JevSetupError
+from linkedin_auto_connect.domain.models import JevRuntimeError, JevSetupError
 
 PARITY_TEXTS = {
     "hr": "HR Business Partner at Northwind",

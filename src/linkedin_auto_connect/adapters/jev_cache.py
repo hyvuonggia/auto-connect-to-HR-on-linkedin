@@ -19,8 +19,8 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .models import RelevanceDecision
-from .ports import Classifier
+from ..domain.models import RelevanceDecision
+from ..domain.ports import Classifier
 
 logger = logging.getLogger(__name__)
 

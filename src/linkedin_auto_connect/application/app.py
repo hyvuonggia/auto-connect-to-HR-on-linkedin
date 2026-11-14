@@ -1,8 +1,8 @@
 """Application orchestration: authentication, restarts and cookie persistence.
 
 The application depends only on the protocols in
-:mod:`linkedin_auto_connect.ports`; the Playwright adapter is injected by the
-CLI.
+:mod:`linkedin_auto_connect.domain.ports`; the Playwright adapter is injected by
+the CLI.
 """
 
 from __future__ import annotations
@@ -11,9 +11,9 @@ import logging
 import time
 from collections.abc import Callable
 
-from .config import Settings
-from .models import LoginStatus, StopReason
-from .ports import (
+from ..config import Settings
+from ..domain.models import LoginStatus, StopReason
+from ..domain.ports import (
     BrowserSession,
     CookieStore,
     LimitPolicy,

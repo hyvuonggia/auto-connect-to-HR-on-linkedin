@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeClassifier, it_decision
-from linkedin_auto_connect.jev import (
+from linkedin_auto_connect.adapters.jev import (
     DEFAULT_BASE_URL,
     JevClassifier,
     JevConfig,
@@ -16,12 +16,16 @@ from linkedin_auto_connect.jev import (
     load_jev_config,
     systemone_endpoint,
 )
-from linkedin_auto_connect.jev_cache import (
+from linkedin_auto_connect.adapters.jev_cache import (
     CachedClassifier,
     JsonDecisionCache,
     decision_key,
 )
-from linkedin_auto_connect.models import JevRuntimeError, JevSetupError, RelevanceDecision
+from linkedin_auto_connect.domain.models import (
+    JevRuntimeError,
+    JevSetupError,
+    RelevanceDecision,
+)
 
 VALID_RESPONSE = {
     "model": "jev-test",

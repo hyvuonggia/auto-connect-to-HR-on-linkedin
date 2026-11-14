@@ -1,4 +1,4 @@
-"""Behaviour tests for :mod:`linkedin_auto_connect.app`."""
+"""Behaviour tests for :mod:`linkedin_auto_connect.application.app`."""
 
 from __future__ import annotations
 
@@ -16,10 +16,10 @@ from fakes import (
     FakeSessionFactory,
     FakeSource,
 )
-from linkedin_auto_connect.app import Application
+from linkedin_auto_connect.application.app import Application
 from linkedin_auto_connect.config import Settings
-from linkedin_auto_connect.matcher import KeywordMatcher
-from linkedin_auto_connect.models import LoginStatus
+from linkedin_auto_connect.domain.matcher import KeywordMatcher
+from linkedin_auto_connect.domain.models import LoginStatus
 
 COOKIES: list[dict[str, Any]] = [{"name": "li_at", "value": "secret"}]
 

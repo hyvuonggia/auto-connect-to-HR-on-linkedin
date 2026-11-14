@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 
-from linkedin_auto_connect.browser import (
+from linkedin_auto_connect.adapters.browser import (
     CARD_SELECTOR,
     CONNECT_BUTTON_SELECTOR,
     MILLISECONDS_PER_SECOND,
@@ -22,7 +22,7 @@ from linkedin_auto_connect.browser import (
     parse_invite_label,
 )
 from linkedin_auto_connect.config import Settings
-from linkedin_auto_connect.models import InviteStatus, LoginStatus
+from linkedin_auto_connect.domain.models import InviteStatus, LoginStatus
 
 
 class StubButton:

@@ -11,8 +11,8 @@ two environment variables:
     The System One base URL, for example
     ``https://opencode.ai/inference/systemone``.
 
-The rest of the package depends on :class:`linkedin_auto_connect.ports.Classifier`,
-never on this module.
+The rest of the package depends on
+:class:`linkedin_auto_connect.domain.ports.Classifier`, never on this module.
 """
 
 from __future__ import annotations
@@ -28,8 +28,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .matcher import candidate_name
-from .models import JevRuntimeError, JevSetupError, RelevanceDecision
+from ..domain.matcher import candidate_name
+from ..domain.models import JevRuntimeError, JevSetupError, RelevanceDecision
 
 logger = logging.getLogger(__name__)
 

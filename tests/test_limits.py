@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from linkedin_auto_connect.limits import InviteLimitPolicy
+from linkedin_auto_connect.domain.limits import InviteLimitPolicy
 
 
 def test_new_policy_starts_empty() -> None:

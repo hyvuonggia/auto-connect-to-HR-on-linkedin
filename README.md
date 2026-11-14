@@ -122,22 +122,28 @@ Any of them ends the run; restarting cannot help, so the script does not retry.
 
 ```
 src/linkedin_auto_connect/
-├── cli.py            # argument parsing, logging, composition root
-├── app.py            # sessions, restarts, cookie persistence
-├── runner.py         # scan → match → click loop
-├── browser.py        # Playwright adapter (the only module importing it)
-├── jev.py            # OpenCode/TypeSafe System One HTTP adapter
-├── jev_cache.py      # persistent decision cache + cached classifier
-├── matcher.py        # keyword prefilter and the Jev composite matcher
-├── limits.py         # weekly-limit and per-run cap arithmetic
-├── cookies.py        # JSON cookie store
-├── models.py         # value objects
-├── ports.py          # Protocols the core depends on
-└── config.py         # Settings dataclass and endpoint defaults
+├── cli.py                    # argument parsing, logging, composition root
+├── config.py                 # Settings dataclass and endpoint defaults
+├── domain/                   # pure rules, no I/O
+│   ├── models.py             # value objects and Jev errors
+│   ├── ports.py              # Protocols the core depends on
+│   ├── matcher.py            # keyword prefilter + Jev composite
+│   └── limits.py             # weekly-limit and per-run cap arithmetic
+├── application/              # orchestration over the ports
+│   ├── app.py                # sessions, restarts, cookie persistence
+│   └── runner.py             # scan → match → click loop
+└── adapters/                 # I/O at the edge
+    ├── browser.py            # Playwright adapter (the only module importing it)
+    ├── cookies.py            # JSON cookie store
+    ├── jev.py                # OpenCode/TypeSafe System One HTTP adapter
+    └── jev_cache.py          # persistent decision cache + cached classifier
 
 tests/                # unit tests, no browser required
 docs/ARCHITECTURE.md  # layering, ports, SOLID rationale
 ```
+
+Dependencies point inward: `adapters` → `application` → `domain`. `cli.py` is
+the only module that names concrete adapters.
 
 Run the tests with `pytest`; they never launch a browser.
 

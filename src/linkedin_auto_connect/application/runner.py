@@ -1,7 +1,7 @@
 """Scan-and-click pass loop for one authenticated profile source.
 
 The runner is pure application logic: it talks only to the protocols in
-:mod:`linkedin_auto_connect.ports` and never imports Playwright.
+:mod:`linkedin_auto_connect.domain.ports` and never imports Playwright.
 """
 
 from __future__ import annotations
@@ -10,9 +10,9 @@ import logging
 import time
 from collections.abc import Callable
 
-from .config import Settings
-from .models import UNLIMITED_INVITES, InviteStatus, PassResult, SessionResult, StopReason
-from .ports import LimitPolicy, Matcher, ProfileSource, never_stop
+from ..config import Settings
+from ..domain.models import UNLIMITED_INVITES, InviteStatus, PassResult, SessionResult, StopReason
+from ..domain.ports import LimitPolicy, Matcher, ProfileSource, never_stop
 
 logger = logging.getLogger(__name__)
 

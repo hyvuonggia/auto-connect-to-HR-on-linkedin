@@ -1,4 +1,4 @@
-"""Behaviour tests for :mod:`linkedin_auto_connect.runner`."""
+"""Behaviour tests for :mod:`linkedin_auto_connect.application.runner`."""
 
 from __future__ import annotations
 
@@ -6,10 +6,10 @@ from collections.abc import Callable
 from dataclasses import replace
 
 from fakes import FakeCard, FakeLimitPolicy, FakeSource
+from linkedin_auto_connect.application.runner import ConnectionRunner
 from linkedin_auto_connect.config import Settings
-from linkedin_auto_connect.matcher import KeywordMatcher
-from linkedin_auto_connect.models import InviteStatus, SessionResult, StopReason
-from linkedin_auto_connect.runner import ConnectionRunner
+from linkedin_auto_connect.domain.matcher import KeywordMatcher
+from linkedin_auto_connect.domain.models import InviteStatus, SessionResult, StopReason
 
 
 def make_settings(**overrides: object) -> Settings:

@@ -12,7 +12,7 @@ from pathlib import Path
 from types import FrameType
 
 from . import __version__
-from .app import Application
+from .application.app import Application
 from .config import Settings
 
 logger = logging.getLogger(__name__)
@@ -282,13 +282,13 @@ def _run_application(settings: Settings, interruption: Interruption) -> int:
     """
     from playwright.sync_api import sync_playwright
 
-    from .browser import PlaywrightSessionFactory
-    from .cookies import JsonCookieStore
-    from .jev import JevClassifier, load_jev_config
-    from .jev_cache import CachedClassifier, JsonDecisionCache
-    from .limits import InviteLimitPolicy
-    from .matcher import ItRelevanceMatcher, KeywordMatcher
-    from .ports import Matcher
+    from .adapters.browser import PlaywrightSessionFactory
+    from .adapters.cookies import JsonCookieStore
+    from .adapters.jev import JevClassifier, load_jev_config
+    from .adapters.jev_cache import CachedClassifier, JsonDecisionCache
+    from .domain.limits import InviteLimitPolicy
+    from .domain.matcher import ItRelevanceMatcher, KeywordMatcher
+    from .domain.ports import Matcher
 
     store = JsonCookieStore(settings.cookies_path)
     keyword_matcher = KeywordMatcher(settings.keywords)

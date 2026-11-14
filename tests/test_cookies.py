@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from linkedin_auto_connect.cookies import JsonCookieStore
+from linkedin_auto_connect.adapters.cookies import JsonCookieStore
 
 COOKIES = [
     {"name": "li_at", "value": "secret", "domain": ".linkedin.com", "path": "/"},
@@ -60,7 +60,9 @@ def test_corrupt_json_returns_none_and_warns(tmp_path, caplog) -> None:
     path = tmp_path / "cookies.json"
     path.write_text("{not valid json", encoding="utf-8")
 
-    with caplog.at_level(logging.WARNING, logger="linkedin_auto_connect.cookies"):
+    with caplog.at_level(
+        logging.WARNING, logger="linkedin_auto_connect.adapters.cookies"
+    ):
         assert JsonCookieStore(path).load() is None
 
     messages = [record.getMessage() for record in caplog.records]
@@ -72,7 +74,9 @@ def test_undecodable_bytes_return_none_and_warn(tmp_path, caplog) -> None:
     path = tmp_path / "cookies.json"
     path.write_bytes(b"\xff\xfe\x00not-utf8")
 
-    with caplog.at_level(logging.WARNING, logger="linkedin_auto_connect.cookies"):
+    with caplog.at_level(
+        logging.WARNING, logger="linkedin_auto_connect.adapters.cookies"
+    ):
         assert JsonCookieStore(path).load() is None
 
     messages = [record.getMessage() for record in caplog.records]
@@ -86,7 +90,9 @@ def test_empty_save_leaves_existing_file_untouched(tmp_path, caplog) -> None:
     store.save(COOKIES)
     before = path.read_text(encoding="utf-8")
 
-    with caplog.at_level(logging.WARNING, logger="linkedin_auto_connect.cookies"):
+    with caplog.at_level(
+        logging.WARNING, logger="linkedin_auto_connect.adapters.cookies"
+    ):
         store.save([])
 
     assert path.read_text(encoding="utf-8") == before

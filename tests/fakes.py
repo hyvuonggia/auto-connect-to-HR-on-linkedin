@@ -9,14 +9,14 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Sequence
 from typing import Any
 
-from linkedin_auto_connect.models import (
+from linkedin_auto_connect.domain.models import (
     Candidate,
     InviteResult,
     InviteStatus,
     LoginStatus,
     RelevanceDecision,
 )
-from linkedin_auto_connect.ports import never_stop
+from linkedin_auto_connect.domain.ports import never_stop
 
 
 class FakeCard:
