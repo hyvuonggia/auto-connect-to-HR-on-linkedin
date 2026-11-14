@@ -1,0 +1,73 @@
+"""Tunable settings.
+
+Values are grouped in a frozen dataclass instead of module-level globals so they
+can be overridden per run (CLI) and injected in tests.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from pathlib import Path
+
+LINKEDIN_LOGIN_URL = "https://www.linkedin.com/login"
+LINKEDIN_NETWORK_URL = "https://www.linkedin.com/mynetwork/grow/"
+
+DEFAULT_KEYWORDS: tuple[str, ...] = (
+    "hr",
+    "recruiter",
+    "talent",
+    "acquisition",
+    "human",
+    "resource",
+    "recruitment",
+    "headhunter",
+    "hiring",
+    "employment",
+    "people",
+    "onboarding",
+    "learning",
+    "looking for",
+    "hrbp",
+)
+
+DEFAULT_COOKIES_PATH = Path("linkedin_cookies.json")
+
+
+@dataclass(frozen=True, slots=True)
+class Settings:
+    """All operational knobs of one run."""
+
+    # --- target ---
+    max_invites_per_run: int = 200
+    """Stop after this many registered invites; ``0`` disables the cap."""
+
+    keywords: tuple[str, ...] = DEFAULT_KEYWORDS
+
+    # --- matching / scanning ---
+    scroll_pixels: int = 600
+    scroll_pause_seconds: float = 2.0
+    max_passes_per_session: int = 200
+    max_no_match_passes: int = 4
+    """Passes with rendered cards but no new match before a session counts as stalled."""
+
+    # --- invite interaction ---
+    click_pause_seconds: float = 1.5
+    registration_wait_ms: int = 3000
+    max_unregistered_clicks: int = 5
+    """Consecutive invites that fail to register before the weekly limit is assumed."""
+
+    # --- browser ---
+    headless: bool = True
+    page_load_timeout_ms: int = 30_000
+    max_restarts: int = 15
+    restart_base_delay_seconds: float = 5.0
+    restart_max_delay_seconds: float = 60.0
+
+    # --- endpoints / storage ---
+    login_url: str = LINKEDIN_LOGIN_URL
+    network_url: str = LINKEDIN_NETWORK_URL
+    cookies_path: Path = field(default=DEFAULT_COOKIES_PATH)
+
+    def restart_delay(self, attempt: int) -> float:
+        """Delay before restart number ``attempt`` (1-based), capped."""
+        return min(self.restart_base_delay_seconds * attempt, self.restart_max_delay_seconds)
