@@ -11,7 +11,7 @@ import time
 from collections.abc import Callable
 
 from .config import Settings
-from .models import InviteStatus, PassResult, SessionResult, StopReason
+from .models import UNLIMITED_INVITES, InviteStatus, PassResult, SessionResult, StopReason
 from .ports import LimitPolicy, Matcher, ProfileSource, never_stop
 
 logger = logging.getLogger(__name__)
@@ -163,7 +163,7 @@ class ConnectionRunner:
                 matched += 1
                 self._policy.record_registered()
                 sent = self._policy.sent
-                if self._settings.max_invites_per_run > 0:
+                if self._settings.max_invites_per_run > UNLIMITED_INVITES:
                     logger.info(
                         "  [+] [%d/%d] Sent: %.40s",
                         sent,

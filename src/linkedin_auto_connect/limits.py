@@ -8,13 +8,16 @@ the pure state machine behind both -- no I/O, no logging.
 
 from __future__ import annotations
 
+from .models import UNLIMITED_INVITES
+
 
 class InviteLimitPolicy:
     """Track registered invites and consecutive unregistered attempts.
 
-    ``max_invites <= 0`` means the per-run invite cap is disabled. When the
-    streak of unregistered attempts reaches ``max_unregistered`` the caller
-    treats the weekly limit as reached and stops the run.
+    ``max_invites`` at or below :data:`UNLIMITED_INVITES` means the per-run
+    invite cap is disabled. When the streak of unregistered attempts reaches
+    ``max_unregistered`` the caller treats the weekly limit as reached and
+    stops the run.
     """
 
     def __init__(self, *, max_invites: int, max_unregistered: int) -> None:
@@ -37,7 +40,9 @@ class InviteLimitPolicy:
     @property
     def at_invite_cap(self) -> bool:
         """True when the per-run invite cap is enabled and has been reached."""
-        return self._max_invites > 0 and self._sent >= self._max_invites
+        if self._max_invites <= UNLIMITED_INVITES:
+            return False
+        return self._sent >= self._max_invites
 
     def record_registered(self) -> None:
         """Count one accepted invite and reset the unregistered streak."""

@@ -17,6 +17,11 @@ from .config import Settings
 
 logger = logging.getLogger(__name__)
 
+EXIT_OK = 0
+EXIT_FAILURE = 1
+EXIT_USAGE = 2
+"""argparse's convention for a malformed command line."""
+
 
 def _non_negative_int(value: str) -> int:
     """argparse type for counts: reject negatives instead of treating them as unlimited."""
@@ -175,8 +180,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     except SystemExit as exc:
         code = exc.code
         if code is None:
-            return 0
-        return code if isinstance(code, int) else 2
+            return EXIT_OK
+        return code if isinstance(code, int) else EXIT_USAGE
 
     configure_logging(args.verbose)
     settings = build_settings(args)
@@ -189,13 +194,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     try:
         _run_application(settings, interruption)
-        return 0
+        return EXIT_OK
     except KeyboardInterrupt:
         logger.info("Stopping gracefully...")
-        return 0
+        return EXIT_OK
     except Exception:
         logger.exception("[!] Unexpected error")
-        return 1
+        return EXIT_FAILURE
 
 
 def _run_application(settings: Settings, interruption: Interruption) -> int:

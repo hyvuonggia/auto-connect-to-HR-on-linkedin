@@ -12,6 +12,11 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+PRIVATE_FILE_MODE = 0o600
+"""Owner read/write only: the jar is a bearer credential."""
+
+JSON_INDENT = 2
+
 
 class JsonCookieStore:
     """Keep the cookie jar as a JSON list in a file on disk.
@@ -69,7 +74,7 @@ class JsonCookieStore:
             return
 
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        payload = json.dumps(list(cookies), indent=2)
+        payload = json.dumps(list(cookies), indent=JSON_INDENT)
 
         descriptor, temporary_name = tempfile.mkstemp(
             dir=self._path.parent,
@@ -80,7 +85,7 @@ class JsonCookieStore:
         # The jar is a bearer credential: keep the file private where the OS can.
         if hasattr(os, "fchmod"):
             try:
-                os.fchmod(descriptor, 0o600)
+                os.fchmod(descriptor, PRIVATE_FILE_MODE)
             except OSError:
                 logger.debug("Could not restrict the cookie file mode.", exc_info=True)
         try:
@@ -91,6 +96,6 @@ class JsonCookieStore:
             temporary_path.unlink(missing_ok=True)
             raise
         try:
-            self._path.chmod(0o600)
+            self._path.chmod(PRIVATE_FILE_MODE)
         except OSError:
             logger.debug("Could not restrict the cookie file mode.", exc_info=True)

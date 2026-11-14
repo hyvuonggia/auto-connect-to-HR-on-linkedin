@@ -57,6 +57,8 @@ NETWORK_SETTLE_MS = 3_000
 MANUAL_LOGIN_POLL_MS = 3_000
 CLICK_TIMEOUT_MS = 5_000
 LIMIT_WALL_INSPECT_LIMIT = 5
+MILLISECONDS_PER_SECOND = 1_000
+LOGIN_BANNER_WIDTH = 60
 
 
 def parse_invite_label(label: str) -> str:
@@ -250,7 +252,7 @@ class PlaywrightSession:
             logger.warning("Could not open the login page: %s", exc)
             return LoginStatus.EXPIRED
 
-        banner = "=" * 60
+        banner = "=" * LOGIN_BANNER_WIDTH
         logger.info(
             "\n%s\n  Please log in to LinkedIn in the browser window.\n"
             "  The script will continue once you are logged in.\n%s",
@@ -416,7 +418,7 @@ class PlaywrightCard:
             logger.warning("Connect click failed for %s: %s", label or "<unknown>", exc)
             return InviteResult(InviteStatus.UNCONFIRMED, f"click failed: {exc}")
 
-        self._page.wait_for_timeout(self._settings.click_pause_seconds * 1000)
+        self._page.wait_for_timeout(self._settings.click_pause_seconds * MILLISECONDS_PER_SECOND)
 
         if self._invite_registered(button):
             return InviteResult(InviteStatus.REGISTERED, label)

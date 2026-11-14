@@ -8,6 +8,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
+UNLIMITED_INVITES = 0
+"""Sentinel for an invite cap: ``0`` means "no per-run limit"."""
+
 
 class LoginStatus(Enum):
     """Outcome of trying to establish an authenticated LinkedIn session."""

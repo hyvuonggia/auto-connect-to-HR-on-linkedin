@@ -23,6 +23,9 @@ from linkedin_auto_connect.models import LoginStatus
 
 COOKIES: list[dict[str, Any]] = [{"name": "li_at", "value": "secret"}]
 
+RESTART_BASE_SECONDS = 5.0
+RESTART_MAX_SECONDS = 60.0
+
 
 def make_settings(**overrides: object) -> Settings:
     """Return app-test settings with small loops and short restart delays."""
@@ -31,8 +34,8 @@ def make_settings(**overrides: object) -> Settings:
         max_passes_per_session=1,
         max_no_match_passes=1,
         max_restarts=2,
-        restart_base_delay_seconds=5.0,
-        restart_max_delay_seconds=60.0,
+        restart_base_delay_seconds=RESTART_BASE_SECONDS,
+        restart_max_delay_seconds=RESTART_MAX_SECONDS,
     )
     return replace(base, **overrides)
 
@@ -147,7 +150,7 @@ def test_stalled_session_restarts_until_max_restarts_then_stops() -> None:
 
     assert result == 0
     assert factory.headless_flags == [True, True, True]
-    assert sleeps == [5.0, 10.0]
+    assert sleeps == [RESTART_BASE_SECONDS, RESTART_BASE_SECONDS * 2]
     assert all(session.close_calls == 1 for session in sessions)
     assert len(store.saved) == 3
 
