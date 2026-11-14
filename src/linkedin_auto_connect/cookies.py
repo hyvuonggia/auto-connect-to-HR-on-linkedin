@@ -68,7 +68,7 @@ class JsonCookieStore:
         return data
 
     def save(self, cookies: Sequence[dict[str, Any]]) -> None:
-        """Persist *cookies* atomically, ignoring an empty jar."""
+        """Persist *cookies* atomically and owner-only, ignoring an empty jar."""
         if not cookies:
             logger.warning("Refusing to overwrite cookie file %s with an empty jar.", self._path)
             return
@@ -82,7 +82,6 @@ class JsonCookieStore:
             suffix=".tmp",
         )
         temporary_path = Path(temporary_name)
-        # The jar is a bearer credential: keep the file private where the OS can.
         if hasattr(os, "fchmod"):
             try:
                 os.fchmod(descriptor, PRIVATE_FILE_MODE)

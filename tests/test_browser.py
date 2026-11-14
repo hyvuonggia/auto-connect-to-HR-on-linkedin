@@ -14,6 +14,7 @@ import pytest
 from linkedin_auto_connect.browser import (
     CARD_SELECTOR,
     CONNECT_BUTTON_SELECTOR,
+    MILLISECONDS_PER_SECOND,
     PENDING_BUTTON_SELECTOR,
     LinkedInNetworkPage,
     PlaywrightCard,
@@ -198,7 +199,8 @@ def test_send_invite_reports_registered_when_the_button_detaches() -> None:
     result = card.send_invite()
 
     assert result.status is InviteStatus.REGISTERED
-    assert page.waits  # the click pause was honoured
+    expected_click_pause_ms = Settings().click_pause_seconds * MILLISECONDS_PER_SECOND
+    assert page.waits == [expected_click_pause_ms]
 
 
 def test_send_invite_reports_unregistered_when_nothing_changes() -> None:

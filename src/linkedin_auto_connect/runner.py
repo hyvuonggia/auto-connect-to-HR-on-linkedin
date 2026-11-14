@@ -101,7 +101,13 @@ class ConnectionRunner:
         return SessionResult(total, StopReason.SCROLL_CAP)
 
     def _run_pass(self, pass_num: int) -> PassResult:
-        """Scan the cards rendered now and click every matching Connect button."""
+        """Scan the cards rendered now and click every matching Connect button.
+
+        A name is recorded as attempted before the click, so a timed-out click
+        can never become a duplicate invite in a later pass. A card whose
+        Connect button is not visible is forgotten again instead: nothing was
+        clicked, and the button is usually just slow to render.
+        """
         cards = self._source.open_cards()
         if not cards:
             logger.debug("[*] Pass %d: no cards to process yet.", pass_num)
@@ -129,14 +135,10 @@ class ConnectionRunner:
                 )
                 return PassResult(matched, True)
 
-            # Mark before clicking: a timed-out click must never be retried.
             self._processed.add(name)
             invite = card.send_invite()
 
             if invite.status is InviteStatus.UNCONFIRMED:
-                # Attempted but the outcome is unknown: keep it as attempted so a
-                # possible invite is never duplicated, and do not touch the
-                # weekly-limit streak, which this says nothing about.
                 logger.warning(
                     "  [!] Invite state unknown for %.40s (%s) — not retrying.",
                     name,
@@ -178,8 +180,6 @@ class ConnectionRunner:
                 continue
 
             logger.warning("  [!] Connect button not visible for: %.40s", name)
-            # A button that is not visible right now is transient (slow render):
-            # forget the name so a later pass can retry it, unlike a real attempt.
             self._processed.discard(name)
 
         return PassResult(matched, False)

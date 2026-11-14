@@ -1,4 +1,8 @@
-"""Tests for the keyword matching policy."""
+"""Tests for the keyword matching policy.
+
+``PARITY_TEXTS`` holds one realistic card text per default keyword, proving
+parity with the old single-file ``matches_keywords()`` for every keyword.
+"""
 
 from __future__ import annotations
 
@@ -7,8 +11,6 @@ import pytest
 from linkedin_auto_connect.config import DEFAULT_KEYWORDS
 from linkedin_auto_connect.matcher import KeywordMatcher
 
-# One realistic card text per default keyword, proving parity with the old
-# single-file ``matches_keywords()`` for every configured keyword.
 PARITY_TEXTS = {
     "hr": "HR Business Partner at Northwind",
     "recruiter": "Senior Technical Recruiter at Contoso",
@@ -40,12 +42,14 @@ def test_every_default_keyword_matches_a_typical_card(keyword: str) -> None:
 
 
 def test_word_boundaries_do_not_match_inside_a_word() -> None:
-    """A short keyword such as "an" must not match inside a longer word."""
+    """A short keyword such as "an" must not match inside a longer word.
+
+    A standalone token is still a whole word and does match, mirroring the old
+    ``\ban\b`` logic: only substrings inside words are rejected.
+    """
     matcher = KeywordMatcher(["an"])
     assert matcher.matches("Leanne") is False
     assert matcher.matches("Anand") is False
-    # A standalone token is a whole word, so it still matches. This mirrors the
-    # old ``\ban\b`` logic; only substrings inside words are rejected.
     assert matcher.matches("Le An") is True
     assert matcher.matches("Le An, an engineer") is True
 
@@ -99,13 +103,15 @@ def test_no_keywords_matches_nothing() -> None:
 
 
 def test_special_regex_characters_are_escaped() -> None:
-    """A keyword such as "c++" is literal, never a regex quantifier."""
+    """A keyword such as "c++" is literal, never a regex quantifier.
+
+    The trailing ``\\b`` sits after a non-word character, so it only matches when
+    a word character follows the literal "c++".
+    """
     matcher = KeywordMatcher(["c++"])
     assert matcher.keywords == ("c++",)
     assert matcher.matches("ccc") is False
     assert matcher.matches("c") is False
-    # The mandated trailing \b sits after a non-word character, so it can only
-    # match when a word character follows the literal "c++".
     assert matcher.matches("skills: c++dev") is True
 
 
