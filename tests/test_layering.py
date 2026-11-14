@@ -14,6 +14,7 @@ CORE_MODULES = (
     "runner.py",
     "app.py",
     "matcher.py",
+    "jev_cache.py",
     "limits.py",
     "cookies.py",
 )

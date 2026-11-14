@@ -20,6 +20,7 @@ DEFAULT_KEYWORDS: tuple[str, ...] = (
     "human",
     "resource",
     "recruitment",
+    "recruiting",
     "headhunter",
     "hiring",
     "employment",
@@ -31,6 +32,7 @@ DEFAULT_KEYWORDS: tuple[str, ...] = (
 )
 
 DEFAULT_COOKIES_PATH = Path("linkedin_cookies.json")
+DEFAULT_IT_CACHE_PATH = Path("linkedin_it_decisions.json")
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +51,17 @@ class Settings:
     max_passes_per_session: int = 200
     max_no_match_passes: int = 4
     """Passes with rendered cards but no new match before a session counts as stalled."""
+
+    # --- Jev IT-relevance filter ---
+    jev_enabled: bool = True
+    """Use Jev when it is configured; ``--no-jev`` restores keyword-only matching."""
+
+    jev_timeout_seconds: float = 15.0
+    jev_max_attempts: int = 3
+    it_yes_threshold: float = 0.7
+    it_no_threshold: float = 0.3
+    it_evidence_threshold: float = 0.4
+    it_cache_path: Path = field(default=DEFAULT_IT_CACHE_PATH)
 
     # --- invite interaction ---
     click_pause_seconds: float = 1.5

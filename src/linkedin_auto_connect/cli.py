@@ -34,6 +34,17 @@ def _non_negative_int(value: str) -> int:
     return number
 
 
+def _probability(value: str) -> float:
+    """argparse type for Jev thresholds: a number between 0 and 1."""
+    try:
+        number = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"invalid probability: {value!r}") from exc
+    if not 0.0 <= number <= 1.0:
+        raise argparse.ArgumentTypeError("must be between 0 and 1")
+    return number
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the parser shared by the console script and ``python -m``."""
     parser = argparse.ArgumentParser(
@@ -88,6 +99,48 @@ def build_parser() -> argparse.ArgumentParser:
         help="pause after each Connect click",
     )
     parser.add_argument(
+        "--no-jev",
+        dest="jev_enabled",
+        action="store_false",
+        default=None,
+        help="use keyword-only HR matching even when Jev is configured",
+    )
+    parser.add_argument(
+        "--jev-timeout",
+        type=float,
+        default=None,
+        metavar="SECONDS",
+        help="timeout for one Jev request",
+    )
+    parser.add_argument(
+        "--it-yes-threshold",
+        type=_probability,
+        default=None,
+        metavar="P",
+        help="connect when Jev's IT probability is at least P (default: 0.7)",
+    )
+    parser.add_argument(
+        "--it-no-threshold",
+        type=_probability,
+        default=None,
+        metavar="P",
+        help="log a confident non-IT decision below P (default: 0.3)",
+    )
+    parser.add_argument(
+        "--it-evidence-threshold",
+        type=_probability,
+        default=None,
+        metavar="P",
+        help="skip cards below this evidence probability (default: 0.4)",
+    )
+    parser.add_argument(
+        "--it-cache",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help="path to the Jev decision cache",
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="enable debug logging",
@@ -132,6 +185,24 @@ def build_settings(args: argparse.Namespace) -> Settings:
     click_pause = getattr(args, "click_pause", None)
     if click_pause is not None:
         overrides["click_pause_seconds"] = click_pause
+    jev_enabled = getattr(args, "jev_enabled", None)
+    if jev_enabled is not None:
+        overrides["jev_enabled"] = jev_enabled
+    jev_timeout = getattr(args, "jev_timeout", None)
+    if jev_timeout is not None:
+        overrides["jev_timeout_seconds"] = jev_timeout
+    it_yes = getattr(args, "it_yes_threshold", None)
+    if it_yes is not None:
+        overrides["it_yes_threshold"] = it_yes
+    it_no = getattr(args, "it_no_threshold", None)
+    if it_no is not None:
+        overrides["it_no_threshold"] = it_no
+    it_evidence = getattr(args, "it_evidence_threshold", None)
+    if it_evidence is not None:
+        overrides["it_evidence_threshold"] = it_evidence
+    it_cache = getattr(args, "it_cache", None)
+    if it_cache is not None:
+        overrides["it_cache_path"] = Path(it_cache)
 
     return replace(Settings(), **overrides)
 
@@ -213,10 +284,40 @@ def _run_application(settings: Settings, interruption: Interruption) -> int:
 
     from .browser import PlaywrightSessionFactory
     from .cookies import JsonCookieStore
+    from .jev import JevClassifier, load_jev_config
+    from .jev_cache import CachedClassifier, JsonDecisionCache
     from .limits import InviteLimitPolicy
-    from .matcher import KeywordMatcher
+    from .matcher import ItRelevanceMatcher, KeywordMatcher
+    from .ports import Matcher
 
     store = JsonCookieStore(settings.cookies_path)
+    keyword_matcher = KeywordMatcher(settings.keywords)
+    matcher: Matcher = keyword_matcher
+    if settings.jev_enabled:
+        jev_config = load_jev_config(
+            timeout_seconds=settings.jev_timeout_seconds,
+            max_attempts=settings.jev_max_attempts,
+        )
+        if jev_config is None:
+            logger.warning(
+                "[!] Jev is not configured (set JEV_API_KEY and JEV_BASE_URL in "
+                ".env); falling back to keyword-only HR matching."
+            )
+        else:
+            cache = JsonDecisionCache(settings.it_cache_path, jev_config.model)
+            matcher = ItRelevanceMatcher(
+                keyword_matcher,
+                CachedClassifier(JevClassifier(jev_config), cache),
+                yes_threshold=settings.it_yes_threshold,
+                no_threshold=settings.it_no_threshold,
+                evidence_threshold=settings.it_evidence_threshold,
+            )
+            logger.info(
+                "[*] Jev IT-relevance filter enabled (model=%s).", jev_config.model
+            )
+    else:
+        logger.info("[*] Jev disabled (--no-jev); using keyword-only HR matching.")
+
     with sync_playwright() as playwright:
         factory = PlaywrightSessionFactory(
             cookie_store=store,
@@ -227,7 +328,7 @@ def _run_application(settings: Settings, interruption: Interruption) -> int:
             factory,
             store,
             settings,
-            KeywordMatcher(settings.keywords),
+            matcher,
             should_stop=interruption.should_stop,
             policy=InviteLimitPolicy(
                 max_invites=settings.max_invites_per_run,

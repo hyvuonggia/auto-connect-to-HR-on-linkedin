@@ -76,6 +76,46 @@ def test_headless_flag_can_turn_headless_back_on() -> None:
     assert build_settings(args).headless is True
 
 
+def test_build_settings_applies_jev_flags() -> None:
+    """Every Jev/filter flag replaces its default."""
+    args = build_parser().parse_args(
+        [
+            "--no-jev",
+            "--jev-timeout",
+            "9.5",
+            "--it-yes-threshold",
+            "0.8",
+            "--it-no-threshold",
+            "0.2",
+            "--it-evidence-threshold",
+            "0.5",
+            "--it-cache",
+            "decisions.json",
+        ]
+    )
+
+    settings = build_settings(args)
+
+    assert settings.jev_enabled is False
+    assert settings.jev_timeout_seconds == 9.5
+    assert settings.it_yes_threshold == 0.8
+    assert settings.it_no_threshold == 0.2
+    assert settings.it_evidence_threshold == 0.5
+    assert settings.it_cache_path == Path("decisions.json")
+
+
+@pytest.mark.parametrize(
+    "flag",
+    ["--it-yes-threshold", "--it-no-threshold", "--it-evidence-threshold"],
+)
+def test_probability_flags_reject_values_outside_zero_to_one(flag: str) -> None:
+    """A threshold above 1 is a typo, not a silent no-op."""
+    with pytest.raises(SystemExit) as excinfo:
+        build_parser().parse_args([flag, "1.5"])
+
+    assert excinfo.value.code == 2
+
+
 def test_parse_keywords_trims_and_drops_blanks() -> None:
     """Comma-separated keywords are stripped, with empty entries removed."""
     assert _parse_keywords("  hr , recruiter ,, talent  ") == ("hr", "recruiter", "talent")

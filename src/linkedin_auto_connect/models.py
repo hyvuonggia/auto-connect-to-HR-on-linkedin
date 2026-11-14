@@ -53,6 +53,34 @@ class StopReason(Enum):
     LIMIT_REACHED = "limit_reached"
 
 
+class JevError(Exception):
+    """Base class for failures while asking the Jev decision model."""
+
+
+class JevSetupError(JevError):
+    """Jev is configured but rejects the setup (bad key, no credit, bad request)."""
+
+
+class JevRuntimeError(JevError):
+    """A transient Jev failure (timeout, rate limit, server error)."""
+
+
+@dataclass(frozen=True, slots=True)
+class RelevanceDecision:
+    """Jev's independent answers about one profile card.
+
+    ``is_hr`` is the probability that the person works in HR or recruiting,
+    ``it_related`` the probability that their HR work is tied to the IT
+    industry, and ``evidence`` the probability that the card says enough to
+    judge either question.
+    """
+
+    is_hr: float
+    it_related: float
+    evidence: float
+    model: str = ""
+
+
 @dataclass(frozen=True, slots=True)
 class Candidate:
     """A profile card reduced to what the matching policy needs."""

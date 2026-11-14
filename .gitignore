@@ -1,6 +1,8 @@
 # Session cookies / credentials — never commit
 linkedin_cookies.json
 *.cookies.json
+.env
+linkedin_it_decisions.json
 
 # Python
 __pycache__/

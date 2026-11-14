@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import Any, Protocol
 
-from .models import Candidate, InviteResult, LoginStatus
+from .models import Candidate, InviteResult, LoginStatus, RelevanceDecision
 
 
 def never_stop() -> bool:
@@ -109,6 +109,16 @@ class Matcher(Protocol):
     """Decides whether a card belongs to the target audience."""
 
     def matches(self, text: str | None) -> bool: ...
+
+
+class Classifier(Protocol):
+    """Answers the narrower audience questions for one card.
+
+    Implemented by the Jev adapter and by the caching wrapper; the composite
+    matcher depends only on this protocol, so it can be tested with a fake.
+    """
+
+    def classify(self, text: str) -> RelevanceDecision: ...
 
 
 class LimitPolicy(Protocol):

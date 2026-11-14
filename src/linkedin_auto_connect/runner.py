@@ -124,10 +124,10 @@ class ConnectionRunner:
             if name in self._processed:
                 continue
             if not self._matcher.matches(candidate.text):
-                logger.info("  [-] Skipped (no match): %.40s", name)
+                logger.info("  [-] Skipped (audience filter): %.40s", name)
                 self._processed.add(name)
                 continue
-            logger.info("  [*] Keyword match: %.40s", name)
+            logger.info("  [*] Audience match: %.40s", name)
             if self._policy.at_invite_cap:
                 logger.warning(
                     "[!] Reached configured invite cap (%d) for this run. Stopping.",

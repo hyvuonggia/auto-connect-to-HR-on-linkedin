@@ -23,18 +23,23 @@ can be tested in milliseconds.
    ┌────▼─────┐          ┌───────▼───────┐        ┌───────▼────────┐
    │ matcher  │          │   limits      │        │    models      │
    │ keywords │          │ streak + cap  │        │ value objects  │
-   └──────────┘          └───────────────┘        └────────────────┘
+   │ + Jev    │          └───────────────┘        └────────────────┘
+   └──────────┘
                                  │
                  ┌───────────────▼───────────────┐
-   adapters      │ browser.py    Playwright       │  the only adapter that
-                 │ cookies.py    JSON file        │  imports playwright
+   adapters      │ browser.py    Playwright       │  browser.py is the only
+                 │ jev.py        System One HTTP  │  module importing
+                 │ cookies.py    JSON file        │  playwright
                  └───────────────────────────────┘
 ```
 
+`jev_cache.py` is core: it persists decision hashes and wraps the classifier,
+so the composite matcher can be tested without a network.
+
 The dependency rule: arrows point inward. `models`, `ports`, `config`,
-`matcher`, `limits`, `cookies`, `runner` and `app` never import Playwright.
-`tests/test_layering.py` enforces that by scanning the source, so the rule cannot
-rot silently.
+`matcher`, `jev_cache`, `limits`, `cookies`, `runner` and `app` never import
+Playwright. `tests/test_layering.py` enforces that by scanning the source, so the
+rule cannot rot silently.
 
 ## Ports and why each exists
 
@@ -48,12 +53,35 @@ inherit from anything, and tests implement the same shape with a dozen lines.
 | `BrowserSession` | `browser.PlaywrightSession` | Auth, restarts and cookie persistence are orchestration |
 | `SessionFactory` | `browser.PlaywrightSessionFactory` | Visible/headless retry is a policy of `app` |
 | `CookieStore` | `cookies.JsonCookieStore` | Persistence is replaceable and testable on `tmp_path` |
-| `Matcher` | `matcher.KeywordMatcher` | The audience definition is data, not DOM code |
+| `Matcher` | `matcher.KeywordMatcher`, `matcher.ItRelevanceMatcher` | The audience definition is data, not DOM code |
+| `Classifier` | `jev.JevClassifier`, `jev_cache.CachedClassifier` | The HR/IT judgment is a typed decision, not generated text |
 | `LimitPolicy` | `limits.InviteLimitPolicy` | Limit arithmetic is a pure state machine |
 
 `Candidate` is a value object, not a handle: the matcher sees only `name` and the
 card's visible text. The card keeps the DOM handle, which is why `send_invite`
 takes no arguments.
+
+## The IT-relevance decision
+
+`matcher.ItRelevanceMatcher` is a composite behind the same `Matcher` port. The
+keyword prefilter runs first, so a card that is not even HR-shaped never reaches
+the model. Jev then answers three atomic `noul` questions in one request:
+
+1. `is_hr_role` — is this person actually in HR or recruiting? This is what
+   keeps a software engineer who matched `looking for`, a hiring manager who
+   matched `hiring`, or a machine-learning engineer who matched `learning` out
+   of the audience.
+2. `it_role_or_company` — is their HR work tied to IT (an IT employer, or IT
+   recruiting at any employer)?
+3. `has_enough_evidence` — does the card name an employer or a role whose
+   industry can be identified?
+
+A card is connected only when HR ≥ 0.7, evidence ≥ 0.4, and IT ≥ 0.7. The
+classifier is an edge adapter (`jev.py`); the cache is core (`jev_cache.py`), so
+the composite matcher is unit-tested with a fake classifier and no network. A
+setup rejection falls back to the keyword decision, which preserves the old
+HR-only behaviour when Jev is not configured; transient failures skip the card,
+and five consecutive failures disable Jev for the rest of the run.
 
 ## Where the weekly limit is detected
 
@@ -95,6 +123,9 @@ a blocked session never restart.
 - No dependency-injection framework and no service container: `cli.main` is the
   composition root.
 - No reporting abstraction: modules log, `cli.configure_logging` owns formatting.
+- The Jev adapter uses the standard library (`urllib`) instead of the vendor SDK:
+  one small HTTP call, no added dependency, and `JEV_BASE_URL` keeps the endpoint
+  replaceable.
 - No async: Playwright's sync API is what the original script used and the
   workload is inherently serial (one browser, one page).
 - The "never overwrite a good cookie jar with an empty one" guard lives in

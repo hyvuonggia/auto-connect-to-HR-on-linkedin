@@ -14,6 +14,7 @@ from linkedin_auto_connect.models import (
     InviteResult,
     InviteStatus,
     LoginStatus,
+    RelevanceDecision,
 )
 from linkedin_auto_connect.ports import never_stop
 
@@ -260,3 +261,42 @@ class FakeLimitPolicy:
         self.unregistered_calls += 1
         self.unregistered_streak += 1
         return self.unregistered_streak >= self.unregistered_limit
+
+
+class FakeClassifier:
+    """Classifier fake returning scripted decisions or raising scripted errors."""
+
+    def __init__(
+        self,
+        decisions: Iterable[RelevanceDecision | Exception] = (),
+        *,
+        default: RelevanceDecision | Exception | None = None,
+    ) -> None:
+        """Build a classifier with queued results and an optional fallback."""
+        self._decisions = list(decisions)
+        self._default = default
+        self.texts: list[str] = []
+
+    def classify(self, text: str) -> RelevanceDecision:
+        """Record the text and return the next scripted result."""
+        self.texts.append(text)
+        result = self._decisions.pop(0) if self._decisions else self._default
+        if result is None:
+            raise AssertionError("FakeClassifier has no decision for this call")
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+
+def it_decision(
+    *,
+    is_hr: float = 0.99,
+    it_related: float = 0.99,
+    evidence: float = 0.99,
+) -> RelevanceDecision:
+    """Build an accepted-by-default Jev decision for tests."""
+    return RelevanceDecision(
+        is_hr=is_hr,
+        it_related=it_related,
+        evidence=evidence,
+    )

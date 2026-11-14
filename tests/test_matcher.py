@@ -8,8 +8,14 @@ from __future__ import annotations
 
 import pytest
 
+from fakes import FakeClassifier, it_decision
 from linkedin_auto_connect.config import DEFAULT_KEYWORDS
-from linkedin_auto_connect.matcher import KeywordMatcher
+from linkedin_auto_connect.matcher import (
+    ItRelevanceMatcher,
+    KeywordMatcher,
+    candidate_name,
+)
+from linkedin_auto_connect.models import JevRuntimeError, JevSetupError
 
 PARITY_TEXTS = {
     "hr": "HR Business Partner at Northwind",
@@ -19,6 +25,7 @@ PARITY_TEXTS = {
     "human": "Human Resources Generalist",
     "resource": "Human Resource Coordinator",
     "recruitment": "Recruitment Consultant at Fabrikam",
+    "recruiting": "Recruiting Intern at Contoso",
     "headhunter": "Independent Headhunter",
     "hiring": "Hiring Manager, Platform",
     "employment": "Employment Law Advisor",
@@ -120,3 +127,107 @@ def test_dot_in_keyword_is_literal() -> None:
     matcher = KeywordMatcher(["node.js"])
     assert matcher.matches("Backend engineer (Node.js)") is True
     assert matcher.matches("nodexjs") is False
+
+
+def test_candidate_name_ignores_a_separate_degree_line() -> None:
+    """A LinkedIn degree marker on its own line is not part of the name."""
+    assert (
+        candidate_name("Oanh Nguyen Hoang\n• 2nd\nIT Recruiter")
+        == "Oanh Nguyen Hoang"
+    )
+    assert candidate_name("Anh Nguyen • 2nd\nIT Recruiter") == "Anh Nguyen"
+    assert candidate_name("• 2nd\nAnh Nguyen") == "Anh Nguyen"
+    assert candidate_name(None) == "?"
+
+
+def test_it_matcher_does_not_call_jev_when_the_keyword_misses() -> None:
+    """The keyword prefilter keeps Jev calls off non-candidates."""
+    classifier = FakeClassifier([it_decision()])
+    matcher = ItRelevanceMatcher(KeywordMatcher(["hr"]), classifier)
+
+    assert matcher.matches("software engineer") is False
+    assert classifier.texts == []
+
+
+def test_it_matcher_connects_hr_people_in_it() -> None:
+    """An HR keyword match plus a confident HR/IT decision is accepted."""
+    classifier = FakeClassifier([it_decision()])
+    matcher = ItRelevanceMatcher(KeywordMatcher(["recruiter"]), classifier)
+
+    assert matcher.matches("IT Recruiter at Acme Software") is True
+    assert classifier.texts == ["IT Recruiter at Acme Software"]
+
+
+def test_it_matcher_rejects_a_non_hr_person_matched_by_a_broad_keyword() -> None:
+    """A software engineer matching "looking for" is not an HR candidate."""
+    classifier = FakeClassifier([it_decision(is_hr=0.02)])
+    matcher = ItRelevanceMatcher(KeywordMatcher(["looking for"]), classifier)
+
+    assert matcher.matches("Software engineer looking for new opportunities") is False
+
+
+def test_it_matcher_rejects_hr_at_a_non_it_company() -> None:
+    """HR work with no IT connection is skipped even when the person is HR."""
+    classifier = FakeClassifier([it_decision(it_related=0.05)])
+    matcher = ItRelevanceMatcher(KeywordMatcher(["hr"]), classifier)
+
+    assert matcher.matches("HR Business Partner at a retailer") is False
+
+
+def test_it_matcher_skips_an_uncertain_it_answer() -> None:
+    """A probability between the yes and no thresholds is not acted on."""
+    classifier = FakeClassifier([it_decision(it_related=0.5)])
+    matcher = ItRelevanceMatcher(KeywordMatcher(["hr"]), classifier)
+
+    assert matcher.matches("HR Business Partner at Acme") is False
+
+
+def test_it_matcher_requires_enough_evidence() -> None:
+    """A sparse card is skipped even when the other answers look strong."""
+    classifier = FakeClassifier([it_decision(evidence=0.2)])
+    matcher = ItRelevanceMatcher(KeywordMatcher(["recruiter"]), classifier)
+
+    assert matcher.matches("Recruiter") is False
+
+
+def test_it_matcher_thresholds_are_inclusive() -> None:
+    """Exactly at the thresholds is accepted; just below evidence is not."""
+    matcher = ItRelevanceMatcher(
+        KeywordMatcher(["hr"]),
+        FakeClassifier(
+            [
+                it_decision(is_hr=0.7, it_related=0.7, evidence=0.4),
+                it_decision(is_hr=0.7, it_related=0.7, evidence=0.39),
+            ]
+        ),
+    )
+
+    assert matcher.matches("HR manager") is True
+    assert matcher.matches("HR manager") is False
+
+
+def test_it_matcher_falls_back_to_the_keyword_result_on_setup_error() -> None:
+    """A bad key or missing credit restores the old HR-only behaviour once."""
+    classifier = FakeClassifier([JevSetupError("bad key")])
+    matcher = ItRelevanceMatcher(KeywordMatcher(["hr"]), classifier)
+
+    assert matcher.matches("HR manager") is True
+    assert matcher.matches("HR manager") is True
+    assert len(classifier.texts) == 1
+    assert matcher.jev_active is False
+
+
+def test_it_matcher_skips_after_runtime_failures_and_stops_calling() -> None:
+    """Transient failures skip cards, then disable Jev after the budget."""
+    classifier = FakeClassifier([JevRuntimeError("timeout")], default=JevRuntimeError("timeout"))
+    matcher = ItRelevanceMatcher(
+        KeywordMatcher(["hr"]),
+        classifier,
+        max_failures=3,
+    )
+
+    assert [matcher.matches("HR manager") for _ in range(3)] == [False, False, False]
+    assert len(classifier.texts) == 3
+    assert matcher.matches("HR manager") is False
+    assert len(classifier.texts) == 3
+    assert matcher.jev_active is False

@@ -54,10 +54,57 @@ Press `Ctrl+C` to stop gracefully.
 | `--max-restarts N` | `15` | Browser restarts when a session stops finding profiles |
 | `--scroll-pause S` | `2.0` | Seconds to wait after each scroll |
 | `--click-pause S` | `1.5` | Seconds to wait after each Connect click |
+| `--no-jev` | Jev on if configured | Use keyword-only HR matching |
+| `--jev-timeout S` | `15` | Timeout for one Jev request |
+| `--it-yes-threshold P` | `0.7` | Connect when the HR and IT probabilities are at least P |
+| `--it-no-threshold P` | `0.3` | Log a confident non-IT decision at or below P |
+| `--it-evidence-threshold P` | `0.4` | Skip cards below P evidence |
+| `--it-cache PATH` | `linkedin_it_decisions.json` | Jev decision cache |
 | `--verbose` | off | Debug logging |
 | `--version` | | Print the version |
 
 Defaults live in [src/linkedin_auto_connect/config.py](src/linkedin_auto_connect/config.py).
+
+## IT-relevance filter (Jev)
+
+When a `.env` file provides both `JEV_API_KEY` and `JEV_BASE_URL`, every HR
+keyword match is also checked by
+[Jev](https://opencode.ai/docs/console/models/#jev), a System One decision
+model served by the OpenCode Console. Jev answers three yes/no questions in one
+request:
+
+1. is this person actually in HR or recruiting?
+2. is their HR work tied to the IT industry (an IT employer, or IT recruiting)?
+3. does the card contain enough evidence?
+
+A card is connected only when the persona passes the HR gate, the evidence gate,
+and the IT gate (defaults: HR ≥ 0.7, evidence ≥ 0.4, IT ≥ 0.7). The keyword
+prefilter still runs first, so a software engineer or a hiring manager who
+happens to match a broad keyword such as `looking for` or `hiring` never becomes
+an invite. The filter is on by default when Jev is configured; `--no-jev`
+restores keyword-only matching.
+
+```env
+# .env (git-ignored)
+JEV_API_KEY=your-opencode-console-key
+JEV_BASE_URL=https://opencode.ai/inference/systemone
+```
+
+The filter uses the free `jev-1.13-free` model; there is no model-selection
+flag. If the model is unavailable, the setup fallback keeps the old HR-only
+behaviour.
+
+If the variables are missing, the script logs a warning and keeps the old
+HR-only behaviour. If Jev is configured but rejects the setup (bad key, model
+unavailable, malformed request), the same keyword-only fallback applies.
+Transient failures (timeout, 429/5xx) skip the card; five consecutive failures
+disable Jev for the rest of the run rather than sending non-IT invites.
+
+Decisions are cached in `linkedin_it_decisions.json` by a hash of the card
+text, so restarts and repeated passes do not call Jev again. The cache stores
+no profile text. The visible card text (name, headline, and social-proof lines)
+is sent to the OpenCode Console; review its privacy terms before using the
+filter on sensitive data.
 
 ## How the weekly limit is detected
 
@@ -79,7 +126,9 @@ src/linkedin_auto_connect/
 ├── app.py            # sessions, restarts, cookie persistence
 ├── runner.py         # scan → match → click loop
 ├── browser.py        # Playwright adapter (the only module importing it)
-├── matcher.py        # keyword audience
+├── jev.py            # OpenCode/TypeSafe System One HTTP adapter
+├── jev_cache.py      # persistent decision cache + cached classifier
+├── matcher.py        # keyword prefilter and the Jev composite matcher
 ├── limits.py         # weekly-limit and per-run cap arithmetic
 ├── cookies.py        # JSON cookie store
 ├── models.py         # value objects
@@ -97,6 +146,9 @@ Run the tests with `pytest`; they never launch a browser.
 - `linkedin_cookies.json` holds your live LinkedIn session and is resolved from
   the current working directory (`--cookies` overrides it). It is git-ignored —
   **do not commit or share it**.
+- `.env` holds the Jev credentials and `linkedin_it_decisions.json` holds the
+  decision cache; both are git-ignored. The Jev adapter uses only the Python
+  standard library, so enabling the filter adds no dependency.
 - The `--scroll-pause` and `--click-pause` defaults match the original script,
   with one fix: the original waited ~1.5 *milliseconds* after a click because of
   a missing unit conversion, so clicks are now paced as intended (1.5 s).
