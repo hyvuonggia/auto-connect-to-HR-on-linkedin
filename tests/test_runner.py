@@ -8,11 +8,17 @@ from dataclasses import replace
 
 import pytest
 
-from fakes import FakeCard, FakeLimitPolicy, FakeSource
+from fakes import FakeCard, FakeClassifier, FakeLimitPolicy, FakeSource
 from linkedin_auto_connect.application.runner import ConnectionRunner
 from linkedin_auto_connect.config import Settings
-from linkedin_auto_connect.domain.matcher import KeywordMatcher
-from linkedin_auto_connect.domain.models import InviteStatus, SessionResult, StopReason
+from linkedin_auto_connect.domain.matcher import ItRelevanceMatcher, KeywordMatcher
+from linkedin_auto_connect.domain.models import (
+    InviteStatus,
+    JevRuntimeError,
+    SessionResult,
+    StopReason,
+)
+from linkedin_auto_connect.domain.ports import Matcher
 
 
 def make_settings(**overrides: object) -> Settings:
@@ -24,6 +30,7 @@ def make_runner(
     source: FakeSource,
     policy: FakeLimitPolicy,
     *,
+    matcher: Matcher | None = None,
     settings: Settings | None = None,
     processed: set[str] | None = None,
     should_stop: Callable[[], bool] | None = None,
@@ -34,7 +41,7 @@ def make_runner(
     sleeper = sleeps.append if sleeps is not None else (lambda _seconds: None)
     return ConnectionRunner(
         source,
-        KeywordMatcher(["hr"]),
+        matcher or KeywordMatcher(["hr"]),
         policy,
         settings or make_settings(max_passes_per_session=1, max_no_match_passes=10),
         should_stop=stop,
@@ -82,6 +89,24 @@ def test_explain_cards_logs_each_profile_verdict(
     assert any("PASS (audience): Mona Lisa" in message for message in messages)
     assert any("CHECK: Bob Stone" in message for message in messages)
     assert any("FAIL (audience): Bob Stone" in message for message in messages)
+
+
+def test_jev_failure_budget_stops_the_session() -> None:
+    """Once Jev's failure budget is spent, the run stops instead of scanning forever."""
+    cards = [FakeCard(f"HR Person {index}", "hr manager") for index in range(6)]
+    classifier = FakeClassifier([JevRuntimeError("429")] * 6)
+    matcher = ItRelevanceMatcher(KeywordMatcher(["hr"]), classifier)
+
+    result = make_runner(
+        FakeSource(cards),
+        FakeLimitPolicy(),
+        matcher=matcher,
+        settings=make_settings(max_passes_per_session=1, max_no_match_passes=10),
+    ).run()
+
+    assert result == SessionResult(0, StopReason.JEV_UNAVAILABLE)
+    assert len(classifier.texts) == 5
+    assert all(card.send_calls == 0 for card in cards)
 
 
 def test_invisible_connect_button_is_retried_on_the_next_pass() -> None:

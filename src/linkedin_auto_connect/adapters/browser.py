@@ -51,6 +51,51 @@ PENDING_BUTTON_SELECTOR = 'button[aria-label*="Pending"], button:has-text("Pendi
 DEBUG_SCREENSHOT = "linkedin_debug.png"
 BUTTON_SAMPLE_LIMIT = 5
 
+SCROLL_TO_BOTTOM_JS = """
+async (distance) => {
+  let target = null;
+  let bestDelta = 20;
+  for (const element of document.querySelectorAll('*')) {
+    if (!/(auto|scroll)/.test(getComputedStyle(element).overflowY)) continue;
+    const delta = element.scrollHeight - element.clientHeight;
+    if (delta > bestDelta) {
+      target = element;
+      bestDelta = delta;
+    }
+  }
+  if (!target) {
+    target = document.scrollingElement || document.documentElement;
+  }
+  const step = Math.max(1, distance);
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const beforeTop = target.scrollTop;
+    const beforeHeight = target.scrollHeight;
+    target.scrollTop = Math.min(beforeHeight, beforeTop + step);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const atBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 10;
+    if (atBottom) {
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      if (target.scrollHeight === beforeHeight) break;
+    } else if (target.scrollTop === beforeTop) {
+      break;
+    }
+  }
+  target.scrollTop = target.scrollHeight;
+  return {
+    tag: target.tagName,
+    id: target.id || '',
+    scrollTop: target.scrollTop,
+    scrollHeight: target.scrollHeight,
+    clientHeight: target.clientHeight,
+  };
+}
+"""
+
+SHOW_MORE_PATTERN = re.compile(
+    r"^(show|see)\s+more(\s+suggestions)?$|^(xem|tải|hiển thị)\s+thêm$",
+    re.IGNORECASE,
+)
+
 LIMIT_WALL_PATTERNS: tuple[str, ...] = (
     r"you'?ve\s+reached\s+your\s+weekly\s+(invitation|invite|connection)\s+limit",
     r"weekly\s+(invitation|invite|connection)\s+limit",
@@ -409,11 +454,36 @@ class LinkedInNetworkPage:
             logger.debug("Could not save the debug screenshot.", exc_info=True)
 
     def scroll_down(self, pixels: int) -> None:
-        """Scroll the window down by ``pixels``; page errors are tolerated."""
+        """Step-scroll to the page bottom, then request more suggestions if offered."""
         try:
-            self._page.evaluate("(distance) => window.scrollBy(0, distance)", pixels)
+            result = self._page.evaluate(SCROLL_TO_BOTTOM_JS, pixels)
         except Exception:
             logger.debug("Could not scroll the page.", exc_info=True)
+            return
+        if isinstance(result, dict):
+            level = logging.INFO if self._settings.explain_cards else logging.DEBUG
+            container = f"{result.get('tag', '?')}#{result.get('id', '')}"
+            logger.log(
+                level,
+                "  [*] Scrolled %s to %s/%s.",
+                container,
+                result.get("scrollTop", "?"),
+                result.get("scrollHeight", "?"),
+            )
+        self._click_show_more()
+
+    def _click_show_more(self) -> None:
+        """Click a visible "Show more suggestions" button when LinkedIn renders one."""
+        try:
+            buttons = self._page.get_by_role("button", name=SHOW_MORE_PATTERN)
+            for index in range(min(buttons.count(), BUTTON_SAMPLE_LIMIT)):
+                button = buttons.nth(index)
+                if button.is_visible():
+                    button.click(timeout=CLICK_TIMEOUT_MS)
+                    logger.info("  [*] Clicked 'Show more' to request more suggestions.")
+                    return
+        except Exception:
+            logger.debug("Could not click a Show more button.", exc_info=True)
 
     def limit_wall_visible(self) -> bool:
         """True when a visible weekly-invitation-limit message is on the page."""

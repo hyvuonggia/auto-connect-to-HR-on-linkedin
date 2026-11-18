@@ -145,6 +145,25 @@ class StubCards:
         return self._cards[index]
 
 
+class StubShowMore:
+    """A visible "Show more" button that records clicks."""
+
+    def __init__(self) -> None:
+        self.clicks = 0
+
+    def count(self) -> int:
+        return 1
+
+    def nth(self, index: int) -> StubShowMore:
+        return self
+
+    def is_visible(self) -> bool:
+        return True
+
+    def click(self, timeout: int) -> None:
+        self.clicks += 1
+
+
 class StubPage:
     """A page exposing only what the adapter touches."""
 
@@ -152,6 +171,8 @@ class StubPage:
         self._cards = cards
         self.waits: list[float] = []
         self.screenshots: list[str] = []
+        self.evaluations: list[tuple[str, int]] = []
+        self.show_more = StubShowMore()
 
     def locator(self, selector: str) -> Any:
         assert selector == CARD_SELECTOR
@@ -162,6 +183,14 @@ class StubPage:
 
     def screenshot(self, path: str) -> None:
         self.screenshots.append(path)
+
+    def evaluate(self, script: str, arg: int) -> dict[str, object]:
+        self.evaluations.append((script, arg))
+        return {"tag": "MAIN", "id": "workspace", "scrollTop": 10, "scrollHeight": 20}
+
+    def get_by_role(self, role: str, name: Any = None) -> StubShowMore:
+        assert role == "button"
+        return self.show_more
 
 
 def test_parse_invite_label_extracts_the_name() -> None:
@@ -198,6 +227,32 @@ def test_open_cards_explains_cards_without_a_connect_button(
     assert any("SKIP (no Connect button): Jane Doe" in message for message in messages)
     assert any("None of the 1 rendered card(s)" in message for message in messages)
     assert page.screenshots == [DEBUG_SCREENSHOT]
+
+
+def test_scroll_down_reaches_the_page_bottom_and_clicks_show_more() -> None:
+    """Lazy loading needs the real scroll container, and Show more must be clicked."""
+    page = StubPage([])
+
+    LinkedInNetworkPage(page, Settings()).scroll_down(600)
+
+    script, distance = page.evaluations[0]
+    assert "scrollTop" in script
+    assert "scrollHeight" in script
+    assert "setTimeout" in script
+    assert distance == 600
+    assert page.show_more.clicks == 1
+
+
+def test_scroll_down_reports_the_container(caplog: pytest.LogCaptureFixture) -> None:
+    """Watch mode names the element that was actually scrolled."""
+    page = StubPage([])
+    settings = replace(Settings(), explain_cards=True)
+
+    with caplog.at_level(logging.INFO, logger="linkedin_auto_connect.adapters.browser"):
+        LinkedInNetworkPage(page, settings).scroll_down(600)
+
+    messages = [record.getMessage() for record in caplog.records]
+    assert any("Scrolled MAIN#workspace to 10/20." in message for message in messages)
 
 
 def test_candidate_parses_the_name_and_keeps_the_card_text() -> None:

@@ -97,6 +97,25 @@ class FakeSource:
         return self._wall_last
 
 
+class FakeMatcher:
+    """Matcher fake that rejects everything and can report itself unavailable."""
+
+    def __init__(self, *, unavailable: bool = False) -> None:
+        """Set whether the fake matcher should look exhausted."""
+        self._unavailable = unavailable
+        self.texts: list[str | None] = []
+
+    @property
+    def unavailable(self) -> bool:
+        """Return the scripted availability."""
+        return self._unavailable
+
+    def matches(self, text: str | None) -> bool:
+        """Record the text and reject the card."""
+        self.texts.append(text)
+        return False
+
+
 class FakeSession:
     """Browser-session fake recording authentication and close calls."""
 

@@ -56,6 +56,8 @@ class ConnectionRunner:
 
             outcome = self._run_pass(pass_num)
             total += outcome.matched
+            if outcome.matcher_unavailable:
+                return SessionResult(total, StopReason.JEV_UNAVAILABLE)
             if self._should_stop():
                 logger.info("[*] Stop requested — ending session.")
                 return SessionResult(total, StopReason.STOPPED)
@@ -82,6 +84,12 @@ class ConnectionRunner:
                         self._settings.max_no_match_passes,
                         outcome.checked,
                     )
+                    if outcome.checked == 0:
+                        logger.info(
+                            "[*] Pass %d: every clickable card was already checked earlier in "
+                            "this run; waiting for LinkedIn to render a new batch.",
+                            pass_num,
+                        )
                     if no_match_streak >= self._settings.max_no_match_passes:
                         logger.warning(
                             "[!] No new matches for %d passes — session stalled.",
@@ -96,7 +104,10 @@ class ConnectionRunner:
 
             if pass_num >= max_passes:
                 break
-            logger.debug("[*] Scrolling down to load more profiles...")
+            logger.log(
+                logging.INFO if self._settings.explain_cards else logging.DEBUG,
+                "  [*] Scrolling to the bottom to load more profiles...",
+            )
             self._source.scroll_down(self._settings.scroll_pixels)
             self._sleeper(self._settings.scroll_pause_seconds)
 
@@ -128,7 +139,8 @@ class ConnectionRunner:
                     logger.info("  [%d/%d] SKIP (no name)", position, total)
                 continue
             if name in self._processed:
-                logger.debug("  [%d/%d] SKIP (already checked): %.40s", position, total, name)
+                level = logging.INFO if self._settings.explain_cards else logging.DEBUG
+                logger.log(level, "  [%d/%d] SKIP (already checked): %.40s", position, total, name)
                 continue
             if self._settings.explain_cards:
                 logger.info("  [%d/%d] CHECK: %.40s", position, total, name)
@@ -136,6 +148,9 @@ class ConnectionRunner:
             if not self._matcher.matches(candidate.text):
                 logger.info("  [-] FAIL (audience): %.40s", name)
                 self._processed.add(name)
+                if self._matcher.unavailable:
+                    logger.error("[!] Audience filter is unavailable — stopping this session.")
+                    return PassResult(matched, False, checked, matcher_unavailable=True)
                 continue
             logger.info("  [+] PASS (audience): %.40s", name)
             if self._policy.at_invite_cap:

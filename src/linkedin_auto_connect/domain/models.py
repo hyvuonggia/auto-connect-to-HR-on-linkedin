@@ -51,6 +51,7 @@ class StopReason(Enum):
     SCROLL_CAP = "scroll_cap"
     STOPPED = "stopped"
     LIMIT_REACHED = "limit_reached"
+    JEV_UNAVAILABLE = "jev_unavailable"
 
 
 class JevError(Exception):
@@ -105,6 +106,9 @@ class PassResult:
     limit_hit: bool
     checked: int = 0
     """Profiles whose audience filter actually ran in this pass."""
+
+    matcher_unavailable: bool = False
+    """True when the audience filter can no longer decide, so the run must stop."""
 
 
 @dataclass(frozen=True, slots=True)

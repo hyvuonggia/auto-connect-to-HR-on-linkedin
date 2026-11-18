@@ -66,6 +66,11 @@ class KeywordMatcher:
         """The normalised keywords, in first-seen order."""
         return self._keywords
 
+    @property
+    def unavailable(self) -> bool:
+        """Keyword matching is always available."""
+        return False
+
     def matches(self, text: str | None) -> bool:
         """Return True when *text* contains one of the keywords as a whole word."""
         if not text:
@@ -120,6 +125,11 @@ class ItRelevanceMatcher:
         """False once setup fell back or the runtime failure budget is spent."""
         return not (self._setup_fallback or self._unavailable)
 
+    @property
+    def unavailable(self) -> bool:
+        """True once the runtime failure budget is spent; the run must stop."""
+        return self._unavailable
+
     def matches(self, text: str | None) -> bool:
         """Return True only for an HR keyword match that Jev accepts."""
         if not self._inner.matches(text):
@@ -150,8 +160,7 @@ class ItRelevanceMatcher:
             if self._consecutive_failures >= self._max_failures:
                 self._unavailable = True
                 logger.error(
-                    "[!] Jev unavailable after %d consecutive failures — skipping "
-                    "the remaining cards.",
+                    "[!] Jev unavailable after %d consecutive failures — stopping the run.",
                     self._max_failures,
                 )
             return False

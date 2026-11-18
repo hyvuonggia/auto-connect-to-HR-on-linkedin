@@ -131,6 +131,11 @@ class Application:
                         "[!] LinkedIn weekly connection limit likely reached — stopping. "
                         "Restarting won't help; try again next week."
                     )
+            elif reason is StopReason.JEV_UNAVAILABLE:
+                logger.warning(
+                    "[!] Jev is unavailable (quota or repeated failures) — stopping. "
+                    "Use --no-jev for keyword-only matching, or restore the Jev plan."
+                )
             elif reason is StopReason.STOPPED:
                 logger.info("[*] Stop requested — ending run.")
             else:

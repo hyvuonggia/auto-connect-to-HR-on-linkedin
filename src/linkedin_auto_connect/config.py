@@ -47,7 +47,9 @@ class Settings:
 
     # --- matching / scanning ---
     scroll_pixels: int = 600
-    scroll_pause_seconds: float = 2.0
+    """Minimum scroll step; the adapter always reaches the page bottom as well."""
+    scroll_pause_seconds: float = 3.0
+    """Wait after scrolling for LinkedIn to render the next suggestion batch."""
     max_passes_per_session: int = 200
     max_no_match_passes: int = 4
     """Passes with rendered cards but no new match before a session counts as stalled."""

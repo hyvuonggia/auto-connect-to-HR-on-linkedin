@@ -13,6 +13,7 @@ from fakes import (
     FakeCard,
     FakeCookieStore,
     FakeLimitPolicy,
+    FakeMatcher,
     FakeSession,
     FakeSessionFactory,
     FakeSource,
@@ -21,6 +22,7 @@ from linkedin_auto_connect.application.app import Application
 from linkedin_auto_connect.config import Settings
 from linkedin_auto_connect.domain.matcher import KeywordMatcher
 from linkedin_auto_connect.domain.models import LoginStatus
+from linkedin_auto_connect.domain.ports import Matcher
 
 COOKIES: list[dict[str, Any]] = [{"name": "li_at", "value": "secret"}]
 
@@ -47,6 +49,7 @@ def make_app(
     *,
     settings: Settings | None = None,
     policy: FakeLimitPolicy | None = None,
+    matcher: Matcher | None = None,
     sleeps: list[float] | None = None,
     should_stop: Callable[[], bool] | None = None,
 ) -> Application:
@@ -56,7 +59,7 @@ def make_app(
         factory,
         store,
         settings or make_settings(),
-        KeywordMatcher(["hr"]),
+        matcher if matcher is not None else KeywordMatcher(["hr"]),
         should_stop=should_stop if should_stop is not None else (lambda: False),
         sleeper=sleeper,
         policy=policy or FakeLimitPolicy(),
@@ -255,6 +258,25 @@ def test_reaching_the_target_stops_without_a_restart() -> None:
 
     assert result == 1
     assert factory.headless_flags == [True]
+
+
+def test_jev_unavailable_stops_without_a_restart() -> None:
+    """An exhausted audience filter is terminal; a fresh browser cannot help."""
+    settings = make_settings(max_restarts=5)
+    session = FakeSession(FakeSource([FakeCard("HR Person", "hr manager")]), cookies=COOKIES)
+    factory = FakeSessionFactory([session])
+    store = FakeCookieStore()
+
+    result = make_app(
+        factory,
+        store,
+        settings=settings,
+        matcher=FakeMatcher(unavailable=True),
+    ).run()
+
+    assert result == 0
+    assert factory.headless_flags == [True]
+    assert session.close_calls == 1
 
 
 def test_limit_reached_stops_without_a_restart() -> None:

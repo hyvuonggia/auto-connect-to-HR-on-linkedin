@@ -70,7 +70,7 @@ Press `Ctrl+C` to stop gracefully.
 | `--keywords "a,b,c"` | HR list | Replace the audience keywords |
 | `--cookies PATH` | `linkedin_cookies.json` | Where the cookie jar is stored |
 | `--max-restarts N` | `15` | Consecutive restarts without a new invite before giving up |
-| `--scroll-pause S` | `2.0` | Seconds to wait after each scroll |
+| `--scroll-pause S` | `3.0` | Seconds to wait after each scroll |
 | `--click-pause S` | `1.5` | Seconds to wait after each Connect click |
 | `--no-jev` | Jev on if configured | Use keyword-only HR matching |
 | `--jev-timeout S` | `15` | Timeout for one Jev request |
@@ -116,7 +116,9 @@ If the variables are missing, the script logs a warning and keeps the old
 HR-only behaviour. If Jev is configured but rejects the setup (bad key, model
 unavailable, malformed request), the same keyword-only fallback applies.
 Transient failures (timeout, 429/5xx) skip the card; five consecutive failures
-disable Jev for the rest of the run rather than sending non-IT invites.
+stop the run with a clear message rather than silently sending non-IT invites.
+The free model has a usage quota: when it is exhausted, either wait for the
+quota to reset, switch to `--no-jev`, or use an upgraded Jev plan.
 
 Decisions are cached in `linkedin_it_decisions.json` by a hash of the card
 text, so restarts and repeated passes do not call Jev again. The cache stores
@@ -173,9 +175,13 @@ Run the tests with `pytest`; they never launch a browser.
 - `.env` holds the Jev credentials and `linkedin_it_decisions.json` holds the
   decision cache; both are git-ignored. The Jev adapter uses only the Python
   standard library, so enabling the filter adds no dependency.
-- The `--scroll-pause` and `--click-pause` defaults match the original script,
-  with one fix: the original waited ~1.5 *milliseconds* after a click because of
-  a missing unit conversion, so clicks are now paced as intended (1.5 s).
+- The `--click-pause` default matches the original script, with one fix: the
+  original waited ~1.5 *milliseconds* after a click because of a missing unit
+  conversion, so clicks are now paced as intended (1.5 s).
+- Each pass ends by scrolling the page's real scroll container (`<main>`) to the
+  bottom, because LinkedIn lazy-loads suggestions there and `window.scrollTo`
+  does nothing. `--scroll-pause` controls how long the script waits for the new
+  batch before scanning again.
 - Knobs that are not CLI flags (`scroll_pixels`, `registration_wait_ms`,
   `max_unregistered_clicks`, `max_passes_per_session`, `max_no_match_passes`)
   live in `Settings` in

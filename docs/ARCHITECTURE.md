@@ -107,8 +107,8 @@ composite matcher is unit-tested with a fake classifier and no network.
 
 A setup rejection falls back to the keyword decision, which preserves the old
 HR-only behaviour when Jev is not configured. Transient failures skip the card,
-and five consecutive failures disable Jev for the rest of the run rather than
-silently sending non-IT invites.
+and five consecutive failures end the run: continuing would guarantee zero
+invites while burning browser restarts.
 
 ## Where the weekly limit is detected
 

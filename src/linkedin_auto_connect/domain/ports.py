@@ -110,6 +110,10 @@ class Matcher(Protocol):
 
     def matches(self, text: str | None) -> bool: ...
 
+    @property
+    def unavailable(self) -> bool:
+        """True when this matcher can no longer decide and the run should stop."""
+
 
 class Classifier(Protocol):
     """Answers the narrower audience questions for one card.

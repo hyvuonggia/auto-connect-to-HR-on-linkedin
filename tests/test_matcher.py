@@ -231,3 +231,4 @@ def test_it_matcher_skips_after_runtime_failures_and_stops_calling() -> None:
     assert matcher.matches("HR manager") is False
     assert len(classifier.texts) == 3
     assert matcher.jev_active is False
+    assert matcher.unavailable is True
