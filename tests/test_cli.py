@@ -7,7 +7,13 @@ from pathlib import Path
 import pytest
 
 from linkedin_auto_connect import __version__
-from linkedin_auto_connect.cli import _parse_keywords, build_parser, build_settings, main
+from linkedin_auto_connect.cli import (
+    WATCH_SLOW_MO_MS,
+    _parse_keywords,
+    build_parser,
+    build_settings,
+    main,
+)
 from linkedin_auto_connect.config import Settings
 
 
@@ -74,6 +80,37 @@ def test_headless_flag_can_turn_headless_back_on() -> None:
     args = build_parser().parse_args(["--headless"])
 
     assert build_settings(args).headless is True
+
+
+def test_watch_mode_shows_the_browser_and_slows_actions() -> None:
+    """``--watch`` is a visible browser plus a Playwright slow-motion delay."""
+    args = build_parser().parse_args(["--watch"])
+
+    settings = build_settings(args)
+
+    assert settings.headless is False
+    assert settings.slow_mo_ms == WATCH_SLOW_MO_MS
+    assert settings.explain_cards is True
+
+
+def test_verbose_also_logs_every_card() -> None:
+    """Debug runs get the same per-card trail without the slow browser."""
+    args = build_parser().parse_args(["--verbose"])
+
+    settings = build_settings(args)
+
+    assert settings.headless is True
+    assert settings.explain_cards is True
+
+
+def test_watch_mode_wins_over_an_explicit_headless_flag() -> None:
+    """Asking for a hidden browser must not silently cancel the watch request."""
+    args = build_parser().parse_args(["--headless", "--watch"])
+
+    settings = build_settings(args)
+
+    assert settings.headless is False
+    assert settings.slow_mo_ms == WATCH_SLOW_MO_MS
 
 
 def test_build_settings_applies_jev_flags() -> None:

@@ -22,6 +22,9 @@ EXIT_FAILURE = 1
 EXIT_USAGE = 2
 """argparse's convention for a malformed command line."""
 
+WATCH_SLOW_MO_MS = 500
+"""Delay ``--watch`` adds before every Playwright action, in milliseconds."""
+
 
 def _non_negative_int(value: str) -> int:
     """argparse type for counts: reject negatives instead of treating them as unlimited."""
@@ -63,6 +66,11 @@ def build_parser() -> argparse.ArgumentParser:
         action=argparse.BooleanOptionalAction,
         default=None,
         help="run without a visible browser (default: on)",
+    )
+    parser.add_argument(
+        "--watch",
+        action="store_true",
+        help="show the browser, slow actions down, and log every profile card",
     )
     parser.add_argument(
         "--keywords",
@@ -170,6 +178,12 @@ def build_settings(args: argparse.Namespace) -> Settings:
     headless = getattr(args, "headless", None)
     if headless is not None:
         overrides["headless"] = headless
+    if getattr(args, "watch", False):
+        overrides["headless"] = False
+        overrides["slow_mo_ms"] = WATCH_SLOW_MO_MS
+        overrides["explain_cards"] = True
+    if getattr(args, "verbose", False):
+        overrides["explain_cards"] = True
     keywords = getattr(args, "keywords", None)
     if keywords is not None:
         overrides["keywords"] = _parse_keywords(keywords)
@@ -263,6 +277,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         "[*] Target invites for this run: %s",
         settings.max_invites_per_run or "unlimited",
     )
+    if settings.slow_mo_ms:
+        logger.info(
+            "[*] Watch mode: browser visible, actions slowed by %d ms, "
+            "per-card checks logged.",
+            settings.slow_mo_ms,
+        )
     try:
         _run_application(settings, interruption)
         return EXIT_OK

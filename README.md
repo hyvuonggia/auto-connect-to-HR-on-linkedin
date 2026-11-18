@@ -41,6 +41,15 @@ logged in, the cookies are saved to `linkedin_cookies.json` and reused.
 window opens again only if the cookies expired and a manual login is needed, and
 then closes as soon as the session is authenticated.
 
+**Watching the run:** `--watch` opens the browser and slows every Playwright
+action by 500 ms so you can follow what the script does. Every rendered card is
+logged as `CHECK`, `PASS (audience)`, or `FAIL (...)`; with Jev enabled the line
+also carries the HR/IT/evidence scores. If cards render but none has a Connect
+button, the run logs the first card's button labels and saves
+`linkedin_debug.png`. `--watch` always implies a visible browser, even if
+`--headless` is passed. Combine it with `--max-invites 3` for a short demo run.
+`--verbose` enables the same per-card log without slowing the browser.
+
 Press `Ctrl+C` to stop gracefully.
 
 ### Options
@@ -49,6 +58,7 @@ Press `Ctrl+C` to stop gracefully.
 | --- | --- | --- |
 | `--max-invites N` | `200` | Stop after N registered invites (`0` = unlimited) |
 | `--no-headless` | headless | Watch the browser instead of hiding it (`--headless` is the default form) |
+| `--watch` | off | Show the browser, slow every action down, and log every profile card |
 | `--keywords "a,b,c"` | HR list | Replace the audience keywords |
 | `--cookies PATH` | `linkedin_cookies.json` | Where the cookie jar is stored |
 | `--max-restarts N` | `15` | Browser restarts when a session stops finding profiles |

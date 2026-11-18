@@ -27,6 +27,7 @@ from playwright.sync_api import (
 )
 
 from ..config import Settings
+from ..domain.matcher import candidate_name
 from ..domain.models import Candidate, InviteResult, InviteStatus, LoginStatus
 from ..domain.ports import CookieStore, ProfileCard, ProfileSource, never_stop
 
@@ -46,6 +47,9 @@ INVITE_SUFFIX = "to connect"
 CARD_SELECTOR = '[role="listitem"]'
 CONNECT_BUTTON_SELECTOR = 'button[aria-label^="Invite"][aria-label$="to connect"]'
 PENDING_BUTTON_SELECTOR = 'button[aria-label*="Pending"], button:has-text("Pending")'
+
+DEBUG_SCREENSHOT = "linkedin_debug.png"
+BUTTON_SAMPLE_LIMIT = 5
 
 LIMIT_WALL_PATTERNS: tuple[str, ...] = (
     r"you'?ve\s+reached\s+your\s+weekly\s+(invitation|invite|connection)\s+limit",
@@ -111,8 +115,15 @@ class PlaywrightSessionFactory:
         browser: Browser | None = None
         context: BrowserContext | None = None
         try:
-            logger.info("Launching Firefox%s...", " (headless)" if headless else "")
-            browser = self._playwright.firefox.launch(headless=headless)
+            mode = "headless" if headless else "visible"
+            slow_mo = ""
+            if self._settings.slow_mo_ms:
+                slow_mo = f", slow-mo {self._settings.slow_mo_ms} ms"
+            logger.info("Launching Firefox (%s%s)...", mode, slow_mo)
+            browser = self._playwright.firefox.launch(
+                headless=headless,
+                slow_mo=self._settings.slow_mo_ms,
+            )
             context = browser.new_context(
                 viewport={"width": VIEWPORT_WIDTH, "height": VIEWPORT_HEIGHT},
                 user_agent=FIREFOX_USER_AGENT,
@@ -302,6 +313,7 @@ class LinkedInNetworkPage:
         """Wrap the page this session scans and the settings the cards need."""
         self._page = page
         self._settings = settings
+        self._snapshot_taken = False
 
     def card_count(self) -> int:
         """Number of rendered profile cards; ``0`` on error."""
@@ -312,7 +324,12 @@ class LinkedInNetworkPage:
             return 0
 
     def open_cards(self) -> list[ProfileCard]:
-        """Return a live card handle for each rendered card with a Connect button."""
+        """Return a live card handle for each rendered card with a Connect button.
+
+        Every card without a Connect button is logged when ``explain_cards`` is
+        on, because "rendered but not clickable" is otherwise indistinguishable
+        from "not a match" in the run log.
+        """
         cards: list[ProfileCard] = []
         try:
             locators = self._page.locator(CARD_SELECTOR)
@@ -325,6 +342,11 @@ class LinkedInNetworkPage:
             try:
                 card = locators.nth(index)
                 if card.locator(CONNECT_BUTTON_SELECTOR).count() == 0:
+                    if self._settings.explain_cards:
+                        logger.info(
+                            "  [-] SKIP (no Connect button): %s",
+                            self._card_label(card, index),
+                        )
                     continue
                 cards.append(PlaywrightCard(self._page, card, self._settings))
             except Exception:
@@ -334,7 +356,57 @@ class LinkedInNetworkPage:
                     exc_info=True,
                 )
                 continue
+
+        logger.info(
+            "  [*] Card scan: %d rendered, %d with a Connect button.",
+            count,
+            len(cards),
+        )
+        if count and not cards:
+            self._explain_no_connect_cards(locators, count)
         return cards
+
+    @staticmethod
+    def _card_label(card: Locator, index: int) -> str:
+        """Best-effort name for a card whose Connect button is missing."""
+        try:
+            name = candidate_name(card.inner_text())
+        except Exception:
+            name = "?"
+        return name if name != "?" else f"card #{index + 1}"
+
+    def _explain_no_connect_cards(self, locators: Locator, count: int) -> None:
+        """Say why zero cards were clickable and save one screenshot to inspect."""
+        logger.warning(
+            "  [!] None of the %d rendered card(s) has a matching Connect button. "
+            "LinkedIn may have changed its markup, the UI language may not be English, "
+            "or this page is not the suggestions grid.",
+            count,
+        )
+        try:
+            buttons = locators.nth(0).locator("button")
+            sample_count = min(buttons.count(), BUTTON_SAMPLE_LIMIT)
+            samples = []
+            for index in range(sample_count):
+                button = buttons.nth(index)
+                label = _safe_aria_label(button)
+                text = " ".join((button.inner_text() or "").split())
+                samples.append(f"aria-label={label!r} text={text!r}")
+            logger.warning("  [!] First card buttons: %s", "; ".join(samples) or "none")
+        except Exception:
+            logger.debug("Could not sample the first card's buttons.", exc_info=True)
+        self._save_debug_screenshot()
+
+    def _save_debug_screenshot(self) -> None:
+        """Save one screenshot per session so an empty scan can be inspected."""
+        if self._snapshot_taken:
+            return
+        try:
+            self._page.screenshot(path=DEBUG_SCREENSHOT)
+            self._snapshot_taken = True
+            logger.info("  [*] Saved a page screenshot to %s.", DEBUG_SCREENSHOT)
+        except Exception:
+            logger.debug("Could not save the debug screenshot.", exc_info=True)
 
     def scroll_down(self, pixels: int) -> None:
         """Scroll the window down by ``pixels``; page errors are tolerated."""

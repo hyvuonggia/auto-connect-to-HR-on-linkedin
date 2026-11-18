@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from dataclasses import replace
+
+import pytest
 
 from fakes import FakeCard, FakeLimitPolicy, FakeSource
 from linkedin_auto_connect.application.runner import ConnectionRunner
@@ -53,6 +56,32 @@ def test_skips_non_matching_cards_and_marks_them_processed() -> None:
     assert matched_card.send_calls == 1
     assert skipped_card.send_calls == 0
     assert processed == {"Mona Lisa", "Bob Stone"}
+
+
+def test_explain_cards_logs_each_profile_verdict(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Watch mode shows every checked card and whether the filter passed it."""
+    source = FakeSource(
+        [
+            FakeCard("Mona Lisa", "HR manager"),
+            FakeCard("Bob Stone", "software engineer"),
+        ]
+    )
+    settings = make_settings(
+        max_passes_per_session=1,
+        max_no_match_passes=10,
+        explain_cards=True,
+    )
+
+    with caplog.at_level(logging.INFO, logger="linkedin_auto_connect.application.runner"):
+        make_runner(source, FakeLimitPolicy(), settings=settings).run()
+
+    messages = [record.getMessage() for record in caplog.records]
+    assert any("CHECK: Mona Lisa" in message for message in messages)
+    assert any("PASS (audience): Mona Lisa" in message for message in messages)
+    assert any("CHECK: Bob Stone" in message for message in messages)
+    assert any("FAIL (audience): Bob Stone" in message for message in messages)
 
 
 def test_invisible_connect_button_is_retried_on_the_next_pass() -> None:

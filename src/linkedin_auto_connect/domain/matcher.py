@@ -167,16 +167,16 @@ class ItRelevanceMatcher:
             decision.evidence,
         )
         if decision.is_hr < self._hr_threshold:
-            self._log(values, "skip (not HR)", name)
+            self._log(values, "FAIL (not HR)", name)
             return False
         if decision.evidence < self._evidence_threshold:
-            self._log(values, "skip (not enough evidence)", name)
+            self._log(values, "FAIL (not enough evidence)", name)
             return False
         if decision.it_related >= self._yes_threshold:
-            self._log(values, "connect", name)
+            self._log(values, "PASS (connect)", name)
             return True
         reason = "not IT" if decision.it_related <= self._no_threshold else "uncertain IT"
-        self._log(values, f"skip ({reason})", name)
+        self._log(values, f"FAIL ({reason})", name)
         return False
 
     @staticmethod

@@ -65,9 +65,10 @@ class ConnectionRunner:
             if outcome.matched > 0:
                 no_match_streak = 0
                 logger.info(
-                    "[*] Pass %d: %d new invite(s). Session total: %d",
+                    "[*] Pass %d: %d new invite(s) from %d card(s) checked. Session total: %d",
                     pass_num,
                     outcome.matched,
+                    outcome.checked,
                     total,
                 )
             else:
@@ -75,10 +76,11 @@ class ConnectionRunner:
                 if rendered > 0:
                     no_match_streak += 1
                     logger.info(
-                        "[*] Pass %d: no new matches (streak %d/%d).",
+                        "[*] Pass %d: no new matches (streak %d/%d, %d checked).",
                         pass_num,
                         no_match_streak,
                         self._settings.max_no_match_passes,
+                        outcome.checked,
                     )
                     if no_match_streak >= self._settings.max_no_match_passes:
                         logger.warning(
@@ -110,37 +112,45 @@ class ConnectionRunner:
         """
         cards = self._source.open_cards()
         if not cards:
-            logger.debug("[*] Pass %d: no cards to process yet.", pass_num)
+            logger.debug("[*] Pass %d: no clickable cards to process.", pass_num)
             return PassResult(0, False)
 
         matched = 0
-        for card in cards:
+        checked = 0
+        total = len(cards)
+        for position, card in enumerate(cards, start=1):
             if self._should_stop():
                 break
             candidate = card.candidate
             name = candidate.name.strip()
             if not name:
+                if self._settings.explain_cards:
+                    logger.info("  [%d/%d] SKIP (no name)", position, total)
                 continue
             if name in self._processed:
+                logger.debug("  [%d/%d] SKIP (already checked): %.40s", position, total, name)
                 continue
+            if self._settings.explain_cards:
+                logger.info("  [%d/%d] CHECK: %.40s", position, total, name)
+            checked += 1
             if not self._matcher.matches(candidate.text):
-                logger.info("  [-] Skipped (audience filter): %.40s", name)
+                logger.info("  [-] FAIL (audience): %.40s", name)
                 self._processed.add(name)
                 continue
-            logger.info("  [*] Audience match: %.40s", name)
+            logger.info("  [+] PASS (audience): %.40s", name)
             if self._policy.at_invite_cap:
                 logger.warning(
                     "[!] Reached configured invite cap (%d) for this run. Stopping.",
                     self._settings.max_invites_per_run,
                 )
-                return PassResult(matched, True)
+                return PassResult(matched, True, checked)
 
             self._processed.add(name)
             invite = card.send_invite()
 
             if invite.status is InviteStatus.UNCONFIRMED:
                 logger.warning(
-                    "  [!] Invite state unknown for %.40s (%s) — not retrying.",
+                    "  [!] UNKNOWN invite state for %.40s (%s) — not retrying.",
                     name,
                     invite.detail or "unexpected error",
                 )
@@ -150,15 +160,15 @@ class ConnectionRunner:
                 detail = f" ({invite.detail})" if invite.detail else ""
                 limit_assumed = self._policy.record_unregistered()
                 logger.warning(
-                    "  [!] Invite did not register for %.40s%s (%dx unregistered in a row) "
-                    "— weekly limit likely reached.",
+                    "  [-] FAIL (invite did not register): %.40s%s "
+                    "(%dx unregistered in a row) — weekly limit likely reached.",
                     name,
                     detail,
                     self._policy.unregistered_streak,
                 )
                 if limit_assumed or self._source.limit_wall_visible():
                     logger.warning("[!] Weekly invite limit detected — stopping session.")
-                    return PassResult(matched, True)
+                    return PassResult(matched, True, checked)
                 continue
 
             if invite.status is InviteStatus.REGISTERED:
@@ -176,10 +186,10 @@ class ConnectionRunner:
                     logger.info("  [+] Sent: %.40s (pass total: %d)", name, matched)
                 if self._source.limit_wall_visible():
                     logger.warning("[!] Weekly invite limit detected — stopping session.")
-                    return PassResult(matched, True)
+                    return PassResult(matched, True, checked)
                 continue
 
-            logger.warning("  [!] Connect button not visible for: %.40s", name)
+            logger.warning("  [-] FAIL (Connect button not visible): %.40s", name)
             self._processed.discard(name)
 
-        return PassResult(matched, False)
+        return PassResult(matched, False, checked)

@@ -71,6 +71,12 @@ class Settings:
 
     # --- browser ---
     headless: bool = True
+    slow_mo_ms: int = 0
+    """Delay Playwright adds before every action; ``--watch`` raises it for demos."""
+
+    explain_cards: bool = False
+    """Log why every rendered card was skipped; ``--watch`` and ``--verbose`` enable it."""
+
     page_load_timeout_ms: int = 30_000
     max_restarts: int = 15
     restart_base_delay_seconds: float = 5.0

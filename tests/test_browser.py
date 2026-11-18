@@ -7,6 +7,9 @@ card enumeration, and the invite verification state machine.
 
 from __future__ import annotations
 
+import logging
+from dataclasses import replace
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -14,11 +17,13 @@ import pytest
 from linkedin_auto_connect.adapters.browser import (
     CARD_SELECTOR,
     CONNECT_BUTTON_SELECTOR,
+    DEBUG_SCREENSHOT,
     MILLISECONDS_PER_SECOND,
     PENDING_BUTTON_SELECTOR,
     LinkedInNetworkPage,
     PlaywrightCard,
     PlaywrightSession,
+    PlaywrightSessionFactory,
     parse_invite_label,
 )
 from linkedin_auto_connect.config import Settings
@@ -146,6 +151,7 @@ class StubPage:
     def __init__(self, cards: list[StubCard]) -> None:
         self._cards = cards
         self.waits: list[float] = []
+        self.screenshots: list[str] = []
 
     def locator(self, selector: str) -> Any:
         assert selector == CARD_SELECTOR
@@ -153,6 +159,9 @@ class StubPage:
 
     def wait_for_timeout(self, milliseconds: float) -> None:
         self.waits.append(milliseconds)
+
+    def screenshot(self, path: str) -> None:
+        self.screenshots.append(path)
 
 
 def test_parse_invite_label_extracts_the_name() -> None:
@@ -174,11 +183,21 @@ def test_open_cards_returns_a_handle_per_card_with_a_connect_button() -> None:
     assert isinstance(cards[0], PlaywrightCard)
 
 
-def test_open_cards_skips_cards_without_a_connect_button() -> None:
-    """Cards with no Connect button (already pending, or not a person) are dropped."""
+def test_open_cards_explains_cards_without_a_connect_button(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Cards without a Connect button are named in the log, not silently dropped."""
     page = StubPage([StubCard(with_button=False)])
+    settings = replace(Settings(), explain_cards=True)
 
-    assert LinkedInNetworkPage(page, Settings()).open_cards() == []
+    with caplog.at_level(logging.INFO, logger="linkedin_auto_connect.adapters.browser"):
+        cards = LinkedInNetworkPage(page, settings).open_cards()
+
+    messages = [record.getMessage() for record in caplog.records]
+    assert cards == []
+    assert any("SKIP (no Connect button): Jane Doe" in message for message in messages)
+    assert any("None of the 1 rendered card(s)" in message for message in messages)
+    assert page.screenshots == [DEBUG_SCREENSHOT]
 
 
 def test_candidate_parses_the_name_and_keeps_the_card_text() -> None:
@@ -318,3 +337,58 @@ def test_authenticate_maps_the_landing_url_to_a_login_status(
     session = _auth_session({FEED_URL: landing})
 
     assert session.authenticate(allow_manual_login=False) is expected
+
+
+class _StubFirefox:
+    """Records the kwargs of every launch request."""
+
+    def __init__(self) -> None:
+        self.launches: list[dict[str, Any]] = []
+
+    def launch(self, **kwargs: Any) -> _StubBrowser:
+        self.launches.append(kwargs)
+        return _StubBrowser()
+
+
+class _StubBrowser:
+    """A browser that can only create one empty context."""
+
+    def new_context(self, **kwargs: Any) -> _StubContext:
+        return _StubContext()
+
+    def close(self) -> None:
+        pass
+
+
+class _StubContext:
+    """A context exposing just the page and cookie calls the session makes."""
+
+    def new_page(self) -> Any:
+        return object()
+
+    def cookies(self) -> list[dict[str, Any]]:
+        return []
+
+
+def test_session_factory_forwards_the_configured_slow_motion() -> None:
+    """``--watch`` only works if the factory hands Playwright its delay."""
+    firefox = _StubFirefox()
+    factory = PlaywrightSessionFactory(
+        _NoCookies(),
+        replace(Settings(), slow_mo_ms=500),
+        SimpleNamespace(firefox=firefox),
+    )
+
+    factory.open(headless=False)
+
+    assert firefox.launches == [{"headless": False, "slow_mo": 500}]
+
+
+def test_session_factory_launches_without_slow_motion_by_default() -> None:
+    """A normal run must not be delayed by the watch-mode preset."""
+    firefox = _StubFirefox()
+    factory = PlaywrightSessionFactory(_NoCookies(), Settings(), SimpleNamespace(firefox=firefox))
+
+    factory.open(headless=True)
+
+    assert firefox.launches == [{"headless": True, "slow_mo": 0}]

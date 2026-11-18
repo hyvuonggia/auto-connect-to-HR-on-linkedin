@@ -3,6 +3,7 @@ linkedin_cookies.json
 *.cookies.json
 .env
 linkedin_it_decisions.json
+linkedin_debug.png
 
 # Python
 __pycache__/

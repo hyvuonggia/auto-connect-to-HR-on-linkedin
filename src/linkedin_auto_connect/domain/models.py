@@ -103,6 +103,8 @@ class PassResult:
 
     matched: int
     limit_hit: bool
+    checked: int = 0
+    """Profiles whose audience filter actually ran in this pass."""
 
 
 @dataclass(frozen=True, slots=True)
