@@ -41,6 +41,14 @@ logged in, the cookies are saved to `linkedin_cookies.json` and reused.
 window opens again only if the cookies expired and a manual login is needed, and
 then closes as soon as the session is authenticated.
 
+**Run target:** the run stops once it registers 200 invites; `--max-invites N`
+changes the target and `0` means unlimited. A session that stalls or reaches its
+pass cap is closed and a fresh one is opened for the next batch of suggestions.
+The restart budget resets every time a session registers an invite, so a
+productive run keeps going toward the target. The run gives up only after
+`--max-restarts` consecutive restarts with no new invite, when LinkedIn shows
+its weekly limit, or when a login/challenge wall appears.
+
 **Watching the run:** `--watch` opens the browser and slows every Playwright
 action by 500 ms so you can follow what the script does. Every rendered card is
 logged as `CHECK`, `PASS (audience)`, or `FAIL (...)`; with Jev enabled the line
@@ -61,7 +69,7 @@ Press `Ctrl+C` to stop gracefully.
 | `--watch` | off | Show the browser, slow every action down, and log every profile card |
 | `--keywords "a,b,c"` | HR list | Replace the audience keywords |
 | `--cookies PATH` | `linkedin_cookies.json` | Where the cookie jar is stored |
-| `--max-restarts N` | `15` | Browser restarts when a session stops finding profiles |
+| `--max-restarts N` | `15` | Consecutive restarts without a new invite before giving up |
 | `--scroll-pause S` | `2.0` | Seconds to wait after each scroll |
 | `--click-pause S` | `1.5` | Seconds to wait after each Connect click |
 | `--no-jev` | Jev on if configured | Use keyword-only HR matching |

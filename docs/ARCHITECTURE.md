@@ -126,10 +126,13 @@ so `application.app` does not retry.
 
 ## Restart policy
 
-A session that runs out of new profiles (`STALLED`) is restarted with a growing
-delay, because LinkedIn serves a different "People you may know" batch per
-session. `STOPPED`, `SCROLL_CAP`, `LIMIT_REACHED`, an unauthenticated session and
-a blocked session never restart.
+A session that runs out of new profiles (`STALLED`) or reaches its pass cap
+(`SCROLL_CAP`) is closed and replaced by a fresh one, because LinkedIn serves a
+different "People you may know" batch per session. The restart budget resets
+whenever a session registers at least one invite, so the run continues toward
+`--max-invites` as long as it is making progress. `STOPPED`, `LIMIT_REACHED`, an
+unauthenticated session and a blocked session never restart; a run with no new
+invites for `--max-restarts` consecutive restarts gives up.
 
 ## SOLID, concretely
 

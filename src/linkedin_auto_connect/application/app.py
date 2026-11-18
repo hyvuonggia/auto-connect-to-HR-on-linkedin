@@ -89,24 +89,29 @@ class Application:
                 self._persist_cookies(session, blocked=blocked)
                 self._close(session)
 
-            if reason is StopReason.STALLED:
+            if reason in (StopReason.STALLED, StopReason.SCROLL_CAP):
                 if blocked:
                     logger.warning(
                         "[!] LinkedIn challenge/login wall detected. Stopping to avoid "
                         "rate-limiting."
                     )
                     break
+                if result.invites > 0:
+                    restarts = 0
                 restarts += 1
                 if restarts > self._settings.max_restarts:
                     logger.warning(
-                        "[!] Reached max restarts (%d). Stopping.",
+                        "[!] Reached max restarts without a new invite (%d). Stopping.",
                         self._settings.max_restarts,
                     )
                     break
                 delay = self._settings.restart_delay(restarts)
+                cause = (
+                    "No new matches" if reason is StopReason.STALLED else "Session pass cap reached"
+                )
                 logger.info(
-                    "[*] No new matches — restarting in %.1fs (attempt %d/%d, "
-                    "total invites so far: %d)...",
+                    "[*] %s — restarting in %.1fs (attempt %d/%d, total invites so far: %d)...",
+                    cause,
                     delay,
                     restarts,
                     self._settings.max_restarts,
@@ -116,14 +121,20 @@ class Application:
                 continue
 
             if reason is StopReason.LIMIT_REACHED:
-                logger.warning(
-                    "[!] LinkedIn weekly connection limit likely reached — stopping. "
-                    "Restarting won't help; try again next week."
-                )
+                if policy.at_invite_cap:
+                    logger.info(
+                        "[+] Target reached: %d registered invite(s). Stopping.",
+                        policy.sent,
+                    )
+                else:
+                    logger.warning(
+                        "[!] LinkedIn weekly connection limit likely reached — stopping. "
+                        "Restarting won't help; try again next week."
+                    )
             elif reason is StopReason.STOPPED:
                 logger.info("[*] Stop requested — ending run.")
             else:
-                logger.info("[*] Scroll cap reached for this session — stopping.")
+                logger.info("[*] Session ended (%s) — stopping.", reason.value)
             break
 
         logger.info("[+] Run finished. Total registered invites: %d", total)

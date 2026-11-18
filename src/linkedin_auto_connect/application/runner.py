@@ -184,6 +184,9 @@ class ConnectionRunner:
                     )
                 else:
                     logger.info("  [+] Sent: %.40s (pass total: %d)", name, matched)
+                if self._policy.at_invite_cap:
+                    logger.info("  [+] Target reached: %d invite(s).", sent)
+                    return PassResult(matched, True, checked)
                 if self._source.limit_wall_visible():
                     logger.warning("[!] Weekly invite limit detected — stopping session.")
                     return PassResult(matched, True, checked)

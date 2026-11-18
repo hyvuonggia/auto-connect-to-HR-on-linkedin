@@ -90,7 +90,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=_non_negative_int,
         default=None,
         metavar="N",
-        help="maximum browser restarts after a stalled session",
+        help="consecutive browser restarts without a new invite before giving up",
     )
     parser.add_argument(
         "--scroll-pause",

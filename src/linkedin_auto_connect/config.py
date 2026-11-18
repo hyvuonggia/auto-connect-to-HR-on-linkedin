@@ -79,6 +79,7 @@ class Settings:
 
     page_load_timeout_ms: int = 30_000
     max_restarts: int = 15
+    """Consecutive restarts without a new invite before the run gives up."""
     restart_base_delay_seconds: float = 5.0
     restart_max_delay_seconds: float = 60.0
 
